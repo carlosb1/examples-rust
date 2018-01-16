@@ -1,4 +1,5 @@
 use chrono::prelude::*;
+use std::collections::LinkedList;
 
 struct Ship {
     pub name String,
@@ -44,11 +45,17 @@ impl DepartureEvent {
 }
 
 struct EventProcessor {
+    list: LinkedList<DepartureEvent> log;
 }
 
-impl TrackingService {
+impl EventProcessor  {
+    pub fn new () {
+        return EventProcessor {LinkedList::new()};
+    }
+
     pub fn process (departureEvent: DepartureEvent) {
         departureEvent.process();
+        list.push_back(departureEvent);
     }
 }
 
