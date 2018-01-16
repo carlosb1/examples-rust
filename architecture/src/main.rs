@@ -5,29 +5,50 @@ struct Ship {
     pub location String
 }
 
+impl Ship {
+    pub fn new (name: String, location: String) {
+        return Ship {name, location};
+    }
+    pub fn handleDeparture (event: DepartureEvent) {
+        println!("go");
+    
+    }
+}
+
 struct ShippingEvent {
     pub ocurred: DateTime<Utc>,
     pub recorded: DateTime<Utc>
 }
 
-struct ArrivalEvent: ShippingEvent {
-    pub ship Ship,
-    pub port String
-
+impl ShippingEvent {
+    pub fn new (ocurred: DateTime<Utc>, recorded: DateTime<Utc>) {
+        return ShippingEvent {ocurred, recorded};
+    }
 }
 
-struct DepartureEvent: ShippingEvent {
+
+struct DepartureEvent {
+    pub ShippingEvent shippingEvent,
     pub ship Ship,
     pub port String
 }
 
-struct TrackingService {
+impl DepartureEvent {
+    pub fn new (ocurred: DateTime<Utc>, recorded: DateTime<Utc>,
+                ship: Ship, port: String) { 
+        return DepartureEvent {ShippingEvent::new(ocurred, recorded), ship, port};
+    }
+    pub fn process () {
+        self.ship.handleDeparture();
+    }
+}
+
+struct EventProcessor {
 }
 
 impl TrackingService {
-    pub fn recordArrival (ship: Ship, port: Port) {
-    }
-    pub fn recordDeparture (ship :Ship, port: Port) {
+    pub fn process (departureEvent: DepartureEvent) {
+        departureEvent.process();
     }
 }
 
