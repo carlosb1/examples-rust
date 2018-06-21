@@ -18,6 +18,42 @@ use tokio_core::net::TcpListener;
 
 use tokio_core::net::TcpStream;
 
+use futures::{Sink, Stream};
+use futures::stream::SplitSink;
+
+use tokio_io::AsyncRead;
+use tokio_io::codec::Framed;
+use codec::FtpCodec;
+use error::Result;
+use ftp::{Answer, ResultCode};
+
+
+use cmd::Command;
+impl Client {
+    fn new(writer: Writer) -> Client {
+        Client {
+            writer,
+        }
+    }
+    #[async]
+    fn handle_cmd(mut self, cmd: Command) -> Result<Self> {
+        return Ok(self);
+    }
+}
+
+#[async]
+fn client(stream: TcpStream) -> Result<()> {
+    let (writer, reader) = stream.framed(FtpCodec).split();
+    let writer = await!(writer.send(Answer::new(ResultCode::ServiceReadyForNewUser, "Welcome to this FTP Server!")))?;
+    let mut client = Client::new(writer);
+    #[async]
+    for cmd in reader {
+        client = await!(client.handle_cmd(cmd))?;
+    }
+    print!("Client closed");
+    return Ok(());
+}
+
 #[async]
 fn handle_client(stream: TcpStream) -> result::Result<(), ()> {
     await!(client(stream)).map_err(|error| println("Error handling client: {}", error))
