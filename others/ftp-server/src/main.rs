@@ -29,6 +29,7 @@ use ftp::{Answer, ResultCode};
 
 
 use cmd::Command;
+
 impl Client {
     fn new(writer: Writer) -> Client {
         Client {
@@ -50,13 +51,13 @@ fn client(stream: TcpStream) -> Result<()> {
     for cmd in reader {
         client = await!(client.handle_cmd(cmd))?;
     }
-    print!("Client closed");
-    return Ok(());
+    println!("Client closed");
+    return Ok(());;
 }
 
 #[async]
 fn handle_client(stream: TcpStream) -> result::Result<(), ()> {
-    await!(client(stream)).map_err(|error| println("Error handling client: {}", error))
+    await!(client(stream)).map_err(|error| println!("Error handling client: {}", error))
 }
 
 #[async]
