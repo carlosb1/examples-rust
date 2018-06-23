@@ -8,6 +8,7 @@ extern crate tokio_io;
 mod cmd;
 mod ftp;
 mod error;
+mod codec;
 
 use std::io;
 use futures::prelude::*;
@@ -29,6 +30,11 @@ use ftp::{Answer, ResultCode};
 
 
 use cmd::Command;
+type Writer = SplitSink<Framed<TcpStream, FtpCodec>>
+
+struct Client {
+    writer: Writer,
+}
 
 impl Client {
     fn new(writer: Writer) -> Client {
