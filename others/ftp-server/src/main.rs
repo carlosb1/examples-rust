@@ -30,7 +30,7 @@ use ftp::{Answer, ResultCode};
 
 
 use cmd::Command;
-type Writer = SplitSink<Framed<TcpStream, FtpCodec>>
+type Writer = SplitSink<Framed<TcpStream, FtpCodec>>;
 
 struct Client {
     writer: Writer,
