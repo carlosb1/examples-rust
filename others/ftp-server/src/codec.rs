@@ -19,7 +19,6 @@ impl Decoder for FtpCodec {
     
     
     fn decode(&mut self, buf:  &mut BytesMut) -> io::Result<Option<Command>> {
-        io::Result<Option<Command>> {
             if let Some(index) = find_crlf(buf) {
                 let line = buf.split_to(index);
                 buf.split_to(2);
@@ -27,7 +26,6 @@ impl Decoder for FtpCodec {
             } else {
                 Ok(None)
             }
-        }
     }
 }
 
@@ -44,7 +42,7 @@ impl Encoder for FtpCodec {
                 format!("{} {}\r\n", answer.code as u32, answer.message);
             };
         buf.extend(answer.as_bytes());
-        Ok(());
+        Ok(())
     }
 }
 

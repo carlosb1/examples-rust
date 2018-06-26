@@ -10,6 +10,7 @@ mod ftp;
 mod error;
 mod codec;
 
+use std::result;
 use std::io;
 use futures::prelude::*;
 use tokio_core::reactor::Core;
@@ -42,6 +43,12 @@ impl Client {
             writer,
         }
     }
+    #[async]
+    fn send(mut self, answer: Answer) -> Result<Self> {
+        self.writer = await!(self.writer.send(answer))?;
+        Ok(self)
+    }
+
     #[async]
     fn handle_cmd(mut self, cmd: Command) -> Result<Self> {
         return Ok(self);
