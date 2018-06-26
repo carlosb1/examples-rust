@@ -35,13 +35,12 @@ impl Encoder for FtpCodec {
     type Error = io::Error;
 
     fn encode(&mut self, answer: Answer, buf: &mut BytesMut) -> io::Result<()> {
-        let answer = 
             if answer.message.is_empty() {
                 format!("{}\r\n", answer.code as u32);
             } else  {
                 format!("{} {}\r\n", answer.code as u32, answer.message);
             };
-        buf.extend(answer.as_bytes());
+        buf.extend(answer.message.as_bytes());
         Ok(())
     }
 }
