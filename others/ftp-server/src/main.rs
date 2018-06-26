@@ -28,18 +28,21 @@ use tokio_io::codec::Framed;
 use codec::FtpCodec;
 use error::Result;
 use ftp::{Answer, ResultCode};
+use std::path::PathBuf;
 
 
 use cmd::Command;
 type Writer = SplitSink<Framed<TcpStream, FtpCodec>>;
 
 struct Client {
+    cwd: PathBuf,
     writer: Writer,
 }
 
 impl Client {
     fn new(writer: Writer) -> Client {
         Client {
+            cwd: PathBuf::from("/"),
             writer,
         }
     }
@@ -51,12 +54,25 @@ impl Client {
 
     #[async]
     fn handle_cmd(mut self, cmd: Command) -> Result<Self> {
+        println!("Received command: {:?}", cmd);
+        match cmd {
+            Command::User(content) => {
+                if content.is_empty() {
+                    self = await!(self.send(Answer::new(ResultCode::InvalidParameterOrArgument,"Invalid username")))?;
+                } else {
+                    self = await!(self.send(Answer::new(ResultCode::UserloggedIn,&format!("Welcome {}",content))))?;
+                }
+            }
+            Command::Unknown(s) => self = await!(self.send(Answer::new(ResultCode::UnknownCommand, &format!("\"{}\": Not Implemented",s))))?,
+            _=>  self = await!(self.send(Answer::new(ResultCode::CommandNotImplemented, "Not implemented")))?,
+        }
         return Ok(self);
     }
+    
 }
 
 #[async]
-fn client(stream: TcpStream) -> Result<()> {
+fn client(stream: TcpStream) -> Result<()>{
     let (writer, reader) = stream.framed(FtpCodec).split();
     let writer = await!(writer.send(Answer::new(ResultCode::ServiceReadyForNewUser, "Welcome to this FTP Server!")))?;
     let mut client = Client::new(writer);
