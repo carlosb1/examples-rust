@@ -62,7 +62,14 @@ impl Client {
                 } else {
                     self = await!(self.send(Answer::new(ResultCode::UserloggedIn,&format!("Welcome {}",content))))?;
                 }
-            }
+            },
+            Command::Pwd() => {
+                let msg = format!("{}", self.cwd.to_str().unwrap_or(""));
+                if !msg.is_empty() {
+                    let message = format!("\"/{}\" ",msg);
+                    //TODO add await
+                }
+            },
             Command::Unknown(s) => self = await!(self.send(Answer::new(ResultCode::UnknownCommand, &format!("\"{}\": Not Implemented",s))))?,
             _=>  self = await!(self.send(Answer::new(ResultCode::CommandNotImplemented, "Not implemented")))?,
         }
