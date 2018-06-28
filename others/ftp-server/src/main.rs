@@ -63,11 +63,13 @@ impl Client {
                     self = await!(self.send(Answer::new(ResultCode::UserloggedIn,&format!("Welcome {}",content))))?;
                 }
             },
-            Command::Pwd() => {
+            Command::Pwd => {
                 let msg = format!("{}", self.cwd.to_str().unwrap_or(""));
                 if !msg.is_empty() {
                     let message = format!("\"/{}\" ",msg);
-                    //TODO add await
+                    self = await!(self.send(Answer::new(ResultCode::PATHNAMECreated, &message)))?;
+                } else {
+                    self = await!(self.send(Answer::new(ResultCode::FileNotFound, "No such file or directory")))?;
                 }
             },
             Command::Unknown(s) => self = await!(self.send(Answer::new(ResultCode::UnknownCommand, &format!("\"{}\": Not Implemented",s))))?,
