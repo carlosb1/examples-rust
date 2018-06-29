@@ -62,7 +62,7 @@ impl Client {
             } else {
                 path
         });
-        let dir = directory.canocalize();
+        let dir = directory.canonicalize();
         if let Ok(ref dir) = dir {
             if !dir.starts_with(&self.server_root) {
                 return (self, Err(io::ErrorKind::PermissionDenied.into()));
@@ -90,7 +90,7 @@ impl Client {
             }
         }
         self = await!(self.send(Answer::new(ResultCode::FileNotFound, "No such file or directory")))?;
-        Ok(self);
+        return Ok(self);
     }
 
     #[async]
