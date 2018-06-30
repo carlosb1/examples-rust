@@ -142,9 +142,21 @@ impl Client {
     }
 
     #[async]
+    fn quit(mut self) -> Result<Self> {
+        if self.data_writer.is_some() {
+            unimplemented!();
+        } else {
+            self = await!(self.send(Answer::new(ResultCode::ServiceClosingControlConnection, "Closing connection...")))?;
+            self.writer.close()?;
+        }
+        Ok(self)
+    }
+
+    #[async]
     fn handle_cmd(mut self, cmd: Command) -> Result<Self> {
         println!("Received command: {:?}", cmd);
         match cmd {
+            Command::Quit => self = await!(self.quit())?,
             Command::Pasv => self = await!(self.pasv())?,
             Command::Type(typ) => {
                 self.transfer_type = typ;
