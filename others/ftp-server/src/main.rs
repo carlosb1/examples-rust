@@ -40,9 +40,22 @@ use codec::BytesCodec;
 use cmd::Command;
 use cmd::TransferType;
 
+
+use std::ffi::OsString;
+use std::fs::{create_dir, remove_dir_all};
+
 type DataReader = SplitStream<Framed<TcpStream, BytesCodec>>;
 type DataWriter = SplitSink<Framed<TcpStream,BytesCodec>>;
 type Writer = SplitSink<Framed<TcpStream, FtpCodec>>;
+
+
+fn get_parent(path: PathBuf) -> Option<PathBuf> {
+    path.parent().map(|p| p.to_path_buf())
+}
+
+fn get_filename(path: PathBuf) -> Option<OsString> {
+    path.file_name().map(|p| p.to_os_string())
+}
 
 struct Client {
     data_port: Option<u16>,
@@ -152,10 +165,56 @@ impl Client {
         Ok(self)
     }
 
+
+    #[async]
+    fn mkd(mut self, path: PathBuf) -> Result<Self> {
+        let path = self.cwd.join(&path);
+        let parent = get_parent(path.clone());
+        if let Some(parent) = parent {
+            let parent = parent.to_path_buf();
+            let(new_self, res) = self.complete_path(parent);
+            self = new_self;
+            if let Ok(mut dir) = res {
+                if dir.is_dir() {
+                    let filename = get_filename(path);
+                    if let Some(filename) = filename {
+                        dir.push(filename);
+                        if create_dir(dir).is_ok() {
+                            self = await!(self.send(Answer::new(ResultCode::PATHNAMECreated,"Folder sucessfully crated!")))?;
+                            return Ok(self);
+                        }
+                    }
+                }
+            }
+        }
+        self = await!(self.send(Answer::new(ResultCode::FileNotFound, "Could not create folder")))?;
+        Ok(self)
+    }
+
+    #[async]
+    fn rmd(mut self, directory: PathBuf) -> Result<Self> {
+        let path = self.cwd.join(&directory);
+        let (new_self, res) = self.complete_path(path);
+        self = new_self;
+        if let Ok(dir) = res {
+            if remove_dir_all(dir).is_ok() {
+                self = await!(self.send(Answer::new(ResultCode::RequestedFileActionOkay,
+                                                    "Folder successfully removed")))?;
+                return Ok(self);
+            }
+        }
+        self = await!(self.send(Answer::new(ResultCode::FileNotFound,
+                                            "Couldn't remove folder")))?;
+        Ok(self)
+    }
+
+
     #[async]
     fn handle_cmd(mut self, cmd: Command) -> Result<Self> {
         println!("Received command: {:?}", cmd);
         match cmd {
+            Command::Mkd(path) => self = await!(self.mkd(path))?,
+            Command::Rmd(path) => self = await!(self.rmd(path))?,
             Command::Quit => self = await!(self.quit())?,
             Command::Pasv => self = await!(self.pasv())?,
             Command::Type(typ) => {
@@ -186,7 +245,9 @@ impl Client {
         }
         return Ok(self);
     }
-} 
+}
+
+
 
 #[async]
 fn client(stream: TcpStream, handle: Handle,  server_root: PathBuf) -> Result<()>{
