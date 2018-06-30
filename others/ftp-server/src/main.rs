@@ -33,20 +33,38 @@ use std::path::PathBuf;
 use std::path::StripPrefixError;
 
 
+use futures::stream::SplitStream;
+use codec::BytesCodec;
+
+
 use cmd::Command;
+use cmd::TransferType;
+
+type DataReader = SplitStream<Framed<TcpStream, BytesCodec>>;
+type DataWriter = SplitSink<Framed<TcpStream,BytesCodec>>;
 type Writer = SplitSink<Framed<TcpStream, FtpCodec>>;
 
 struct Client {
+    data_port: Option<u16>,
+    data_reader: Option<DataReader>,
+    data_writer: Option<DataWriter>,
+    handle: Handle,
     cwd: PathBuf,
     server_root: PathBuf,
+    transfer_type: TransferType,
     writer: Writer,
 }
 
 impl Client {
-    fn new(writer: Writer, server_root: PathBuf) -> Client {
+    fn new(handle: Handle, writer: Writer, server_root: PathBuf) -> Client {
         Client {
+            data_port: None,
+            data_reader: None,
+            data_writer: None,
+            handle,
             cwd: PathBuf::from("/"),
             server_root,
+            transfer_type: TransferType::Ascii,
             writer,
         }
     }
@@ -92,11 +110,46 @@ impl Client {
         self = await!(self.send(Answer::new(ResultCode::FileNotFound, "No such file or directory")))?;
         return Ok(self);
     }
+    #[async]
+    fn pasv(mut self) -> Result<Self> {
+        let port = 
+            if let Some(port) = self.data_port {
+                port
+             } else {
+                0
+             };
+        if self.data_writer.is_some() {
+            self = await!(self.send(Answer::new(ResultCode::DataConnectionAlreadyOpen,"Already listening...")))?;
+            return Ok(self);
+        }
+        
+        let addr= SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127,0,0,1)),port);
+        let listener = TcpListener::bind(&addr, &self.handle)?;
+        let port = listener.local_addr()?.port();
+
+        self = await!(self.send(Answer::new(ResultCode::EnteringPassiveMode, &format!("127,0,0,1,{},{}", port>>8, port & 0xFF))))?;
+
+        println!("Waiting clients on the port {}...", port);
+
+        #[async]
+        for(stream, _rest) in listener.incoming()  {
+            let (writer, reader) = stream.framed(BytesCodec).split();
+            self.data_writer = Some(writer);
+            self.data_reader = Some(reader);
+            break;
+        }
+        Ok(self)
+    }
 
     #[async]
     fn handle_cmd(mut self, cmd: Command) -> Result<Self> {
         println!("Received command: {:?}", cmd);
         match cmd {
+            Command::Pasv => self = await!(self.pasv())?,
+            Command::Type(typ) => {
+                self.transfer_type = typ;
+                self = await!(self.send(Answer::new(ResultCode::Ok, "Transfer type changed successfully")))?;
+            },
             Command::Cwd(directory) => {
                 self= await!(self.cwd(directory))?;
             },
@@ -124,10 +177,10 @@ impl Client {
 } 
 
 #[async]
-fn client(stream: TcpStream, server_root: PathBuf) -> Result<()>{
+fn client(stream: TcpStream, handle: Handle,  server_root: PathBuf) -> Result<()>{
     let (writer, reader) = stream.framed(FtpCodec).split();
     let writer = await!(writer.send(Answer::new(ResultCode::ServiceReadyForNewUser, "Welcome to this FTP Server!")))?;
-    let mut client = Client::new(writer, server_root);
+    let mut client = Client::new(handle, writer, server_root);
     #[async]
     for cmd in reader {
         client = await!(client.handle_cmd(cmd))?;
@@ -137,8 +190,8 @@ fn client(stream: TcpStream, server_root: PathBuf) -> Result<()>{
 }
 
 #[async]
-fn handle_client(stream: TcpStream, server_root: PathBuf) -> result::Result<(), ()> {
-    await!(client(stream, server_root)).map_err(|error| println!("Error handling client: {}", error))
+fn handle_client(stream: TcpStream, handle: Handle, server_root: PathBuf) -> result::Result<(), ()> {
+    await!(client(stream, handle, server_root)).map_err(|error| println!("Error handling client: {}", error))
 }
 
 #[async]
@@ -151,7 +204,7 @@ fn server(handle: Handle, server_root: PathBuf) -> io::Result<()> {
     for (stream, addr) in listener.incoming() {
         let address = format!("[address : {}]",addr);
         println!("New client {}", address);
-        handle.spawn(handle_client(stream, server_root.clone()));
+        handle.spawn(handle_client(stream, handle.clone() ,server_root.clone()));
         println!("Waiting another client...");
     }
     return Ok(());

@@ -8,6 +8,8 @@ use error::Error;
 use ftp::Answer;
 
 pub struct FtpCodec;
+pub struct BytesCodec;
+
 
 fn find_crlf(buf: &mut BytesMut) -> Option<usize> {
     buf.windows(2).position(|bytes| bytes == b"\r\n")
@@ -45,3 +47,26 @@ impl Encoder for FtpCodec {
     }
 }
 
+impl Decoder for BytesCodec {
+    type Item = Vec<u8>;
+    type Error = io::Error;
+
+    fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<Vec<u8>>> {
+            if buf.len() == 0 {
+                return Ok(None);
+            }
+            let data = buf.to_vec();
+            buf.clear();
+            Ok(Some(data))
+    }
+}
+
+impl Encoder for BytesCodec {
+    type Item = Vec<u8>;
+    type Error = io::Error;
+    
+    fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> io::Result<()> {
+        buf.extend(data);
+        Ok(())
+    }
+}
