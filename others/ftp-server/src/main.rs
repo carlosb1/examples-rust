@@ -208,11 +208,82 @@ impl Client {
         Ok(self)
     }
 
+    #[async]
+    fn send_data(mut self, data: Vec<u8>) -> Result<Self> {
+        if let Some(writer) = self.data_writer {
+            self.data_writer = Some(await!(writer.send(data))?);
+        }
+        Ok(self);
+    }
+    
+    fn close_data_connection(&mut self) {
+        self.data_reader = None;
+        self.data_writer = None;
+    }
+    const MONTHS: [&'static str; 12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+    fn add_file_info(path: PathBuf, out: &mut Vec<u8>) {
+        let extra = if path.is_dir() {"/"} else {""};
+        let is_dir = if path.is_dir() {"d"}  else {"-"};
+        let meta = match ::std::fs::metadata(&path) {
+            Ok(meta) => path,
+            _=> return,
+        },
+        _=>return,
+    };
+    let rights = if meta.permissions().readonly() {
+        "r--r--r--"
+    } else {
+        "rw-rw-rw-"
+    };
+
+
+    }
+    #[async]
+    fn list(mut self, path: Option<PathBuf>) -> Result<Self> {
+        if self.data_writer.is_some() {
+            let path = self.cwd.join(path.unwrap_or_default());
+            let directory = PathBuf::from(&path);
+            let (new_self, res) = self.complete_path(directory);
+            self = ne_self;
+            if  let Ok(path) = res {
+                self = await!(self.send(Answer::new(ResultCode::DataConnectionAlreadyOpen, "Starting to list directory...")));
+            
+                let mut out = vec![];
+                if path.is_dir() {
+                    if let Ok(dir) = read_dir(path) {
+                        for entry in dir {
+                            if let Ok(entry) = entry {
+                                add_file_info(entry.path(),&mut out);
+                            }
+                        }
+                    } else {
+                        self =  await!(self.send(Answer::new(ResultCode::InvalidParameterOrArgument, "No such file or directory")))?;
+                        return Ok(self);
+                    }
+                } else {
+                    add_file_info(entry.path(),&mut out);
+                }
+                self = await!(self.send_data(out))?;
+                println!("-> and done!");
+            } else {
+                self = await!(self.send(Answer::new(ResultCode::InvalidParameterOrArgument)))?;
+            }
+        } else {
+            self = await!(self.send(Answer::new(ResultCode::ConnectionClosed, "No opened data connection")))?;
+        }
+        if self.data_writer.is_some() {
+            self.close_data_connection();
+            self = await!(self.send(Answer::new(ResultCode::ClosingDataConnection, "Transfer done")))?;
+        }
+        Ok(self);
+    }
 
     #[async]
     fn handle_cmd(mut self, cmd: Command) -> Result<Self> {
         println!("Received command: {:?}", cmd);
         match cmd {
+            Command::List(path) => self = await!(self.list(path))?,
             Command::Mkd(path) => self = await!(self.mkd(path))?,
             Command::Rmd(path) => self = await!(self.rmd(path))?,
             Command::Quit => self = await!(self.quit())?,
