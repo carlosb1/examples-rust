@@ -3,6 +3,7 @@ extern crate bytes;
 extern crate futures_await as futures;
 extern crate tokio_core;
 extern crate tokio_io;
+extern crate time;
 
 
 mod cmd;
@@ -43,6 +44,7 @@ use cmd::TransferType;
 
 use std::ffi::OsString;
 use std::fs::{create_dir, remove_dir_all};
+use std::fs::Metadata;
 
 type DataReader = SplitStream<Framed<TcpStream, BytesCodec>>;
 type DataWriter = SplitSink<Framed<TcpStream,BytesCodec>>;
@@ -86,12 +88,12 @@ impl Client {
         self.writer = await!(self.writer.send(answer))?;
         Ok(self)
     }
-    
+
     fn complete_path(self, path: PathBuf) -> (Self, result::Result<PathBuf, io::Error>) {
         let directory = self.server_root.join(if path.has_root() {
-                path.iter().skip(1).collect()
-            } else {
-                path
+            path.iter().skip(1).collect()
+        } else {
+            path
         });
         let dir = directory.canonicalize();
         if let Ok(ref dir) = dir {
@@ -128,14 +130,14 @@ impl Client {
         let port = 
             if let Some(port) = self.data_port {
                 port
-             } else {
+            } else {
                 0
-             };
+            };
         if self.data_writer.is_some() {
             self = await!(self.send(Answer::new(ResultCode::DataConnectionAlreadyOpen,"Already listening...")))?;
             return Ok(self);
         }
-        
+
         let addr= SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127,0,0,1)),port);
         let listener = TcpListener::bind(&addr, &self.handle)?;
         let port = listener.local_addr()?.port();
@@ -215,7 +217,7 @@ impl Client {
         }
         Ok(self);
     }
-    
+
     fn close_data_connection(&mut self) {
         self.data_reader = None;
         self.data_writer = None;
@@ -236,86 +238,108 @@ impl Client {
     } else {
         "rw-rw-rw-"
     };
+    let file_str = format!("{is_dir}{rights} {links} {owner} {group} {size} {month} {day} {hour}:{min} {path}{extra}\r\n", is_dir=is_dir, rights=rights, links=1,
+                           owner="anonymous",
+                           group="anonymous",
+                           month=MONTS[time.tm_mon as usize],
+                           day=time.tm_mday,
+                           hour=time.tm_hour,
+                           min=time.tm_min,
+                           path=path,
+                           extra=extra);
+    out.extend(file_str.as_bytes());
+    println!("==> {:?}", &file_str);
 
+}
+#[async]
+fn list(mut self, path: Option<PathBuf>) -> Result<Self> {
+    if self.data_writer.is_some() {
+        let path = self.cwd.join(path.unwrap_or_default());
+        let directory = PathBuf::from(&path);
+        let (new_self, res) = self.complete_path(directory);
+        self = ne_self;
+        if  let Ok(path) = res {
+            self = await!(self.send(Answer::new(ResultCode::DataConnectionAlreadyOpen, "Starting to list directory...")));
 
-    }
-    #[async]
-    fn list(mut self, path: Option<PathBuf>) -> Result<Self> {
-        if self.data_writer.is_some() {
-            let path = self.cwd.join(path.unwrap_or_default());
-            let directory = PathBuf::from(&path);
-            let (new_self, res) = self.complete_path(directory);
-            self = ne_self;
-            if  let Ok(path) = res {
-                self = await!(self.send(Answer::new(ResultCode::DataConnectionAlreadyOpen, "Starting to list directory...")));
-            
-                let mut out = vec![];
-                if path.is_dir() {
-                    if let Ok(dir) = read_dir(path) {
-                        for entry in dir {
-                            if let Ok(entry) = entry {
-                                add_file_info(entry.path(),&mut out);
-                            }
+            let mut out = vec![];
+            if path.is_dir() {
+                if let Ok(dir) = read_dir(path) {
+                    for entry in dir {
+                        if let Ok(entry) = entry {
+                            add_file_info(entry.path(),&mut out);
                         }
-                    } else {
-                        self =  await!(self.send(Answer::new(ResultCode::InvalidParameterOrArgument, "No such file or directory")))?;
-                        return Ok(self);
                     }
                 } else {
-                    add_file_info(entry.path(),&mut out);
+                    self =  await!(self.send(Answer::new(ResultCode::InvalidParameterOrArgument, "No such file or directory")))?;
+                    return Ok(self);
                 }
-                self = await!(self.send_data(out))?;
-                println!("-> and done!");
             } else {
-                self = await!(self.send(Answer::new(ResultCode::InvalidParameterOrArgument)))?;
+                add_file_info(entry.path(),&mut out);
             }
+            self = await!(self.send_data(out))?;
+            println!("-> and done!");
         } else {
-            self = await!(self.send(Answer::new(ResultCode::ConnectionClosed, "No opened data connection")))?;
+            self = await!(self.send(Answer::new(ResultCode::InvalidParameterOrArgument)))?;
         }
-        if self.data_writer.is_some() {
-            self.close_data_connection();
-            self = await!(self.send(Answer::new(ResultCode::ClosingDataConnection, "Transfer done")))?;
-        }
-        Ok(self);
+    } else {
+        self = await!(self.send(Answer::new(ResultCode::ConnectionClosed, "No opened data connection")))?;
     }
+    if self.data_writer.is_some() {
+        self.close_data_connection();
+        self = await!(self.send(Answer::new(ResultCode::ClosingDataConnection, "Transfer done")))?;
+    }
+    Ok(self);
+}
 
-    #[async]
-    fn handle_cmd(mut self, cmd: Command) -> Result<Self> {
-        println!("Received command: {:?}", cmd);
-        match cmd {
-            Command::List(path) => self = await!(self.list(path))?,
-            Command::Mkd(path) => self = await!(self.mkd(path))?,
-            Command::Rmd(path) => self = await!(self.rmd(path))?,
-            Command::Quit => self = await!(self.quit())?,
-            Command::Pasv => self = await!(self.pasv())?,
-            Command::Type(typ) => {
-                self.transfer_type = typ;
-                self = await!(self.send(Answer::new(ResultCode::Ok, "Transfer type changed successfully")))?;
-            },
-            Command::Cwd(directory) => {
-                self= await!(self.cwd(directory))?;
-            },
-            Command::User(content) => {
-                if content.is_empty() {
-                    self = await!(self.send(Answer::new(ResultCode::InvalidParameterOrArgument,"Invalid username")))?;
-                } else {
-                    self = await!(self.send(Answer::new(ResultCode::UserloggedIn,&format!("Welcome {}",content))))?;
-                }
-            },
-            Command::Pwd => {
-                let msg = format!("{}", self.cwd.to_str().unwrap_or(""));
-                if !msg.is_empty() {
-                    let message = format!("\"/{}\" ",msg);
-                    self = await!(self.send(Answer::new(ResultCode::PATHNAMECreated, &message)))?;
-                } else {
-                    self = await!(self.send(Answer::new(ResultCode::FileNotFound, "No such file or directory")))?;
-                }
-            },
-            Command::Unknown(s) => self = await!(self.send(Answer::new(ResultCode::UnknownCommand, &format!("\"{}\": Not Implemented",s))))?,
-            _=>  self = await!(self.send(Answer::new(ResultCode::CommandNotImplemented, "Not implemented")))?,
-        }
-        return Ok(self);
+#[cfg(windows)]
+fn get_file_info(meta: &Metadata) -> (time::Tm, u64) {
+    use std::os::windows::prelude::*;
+    (time::at(time::Timespec::new(meta.last_write_time())),
+    meta.file_size())
+}
+#[cfg(not(windows))]
+fn get_file_info(meta: &Metadata) -> (time::Tm, u64) {
+    use std::os::unix::prelude::*;
+    (time::at(time::Timespec::new(meta.mtime(), 0)), meta.size())
+}
+
+#[async]
+fn handle_cmd(mut self, cmd: Command) -> Result<Self> {
+    println!("Received command: {:?}", cmd);
+    match cmd {
+        Command::List(path) => self = await!(self.list(path))?,
+        Command::Mkd(path) => self = await!(self.mkd(path))?,
+        Command::Rmd(path) => self = await!(self.rmd(path))?,
+        Command::Quit => self = await!(self.quit())?,
+        Command::Pasv => self = await!(self.pasv())?,
+        Command::Type(typ) => {
+            self.transfer_type = typ;
+            self = await!(self.send(Answer::new(ResultCode::Ok, "Transfer type changed successfully")))?;
+        },
+        Command::Cwd(directory) => {
+            self= await!(self.cwd(directory))?;
+        },
+        Command::User(content) => {
+            if content.is_empty() {
+                self = await!(self.send(Answer::new(ResultCode::InvalidParameterOrArgument,"Invalid username")))?;
+            } else {
+                self = await!(self.send(Answer::new(ResultCode::UserloggedIn,&format!("Welcome {}",content))))?;
+            }
+        },
+        Command::Pwd => {
+            let msg = format!("{}", self.cwd.to_str().unwrap_or(""));
+            if !msg.is_empty() {
+                let message = format!("\"/{}\" ",msg);
+                self = await!(self.send(Answer::new(ResultCode::PATHNAMECreated, &message)))?;
+            } else {
+                self = await!(self.send(Answer::new(ResultCode::FileNotFound, "No such file or directory")))?;
+            }
+        },
+        Command::Unknown(s) => self = await!(self.send(Answer::new(ResultCode::UnknownCommand, &format!("\"{}\": Not Implemented",s))))?,
+        _=>  self = await!(self.send(Answer::new(ResultCode::CommandNotImplemented, "Not implemented")))?,
     }
+    return Ok(self);
+}
 }
 
 
@@ -369,5 +393,5 @@ fn main() {
 
     }
 
-    
+
 }
