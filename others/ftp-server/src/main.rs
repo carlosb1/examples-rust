@@ -43,12 +43,14 @@ use cmd::TransferType;
 
 
 use std::ffi::OsString;
-use std::fs::{create_dir, remove_dir_all};
+use std::fs::{create_dir, remove_dir_all, read_dir};
 use std::fs::Metadata;
 
 type DataReader = SplitStream<Framed<TcpStream, BytesCodec>>;
 type DataWriter = SplitSink<Framed<TcpStream,BytesCodec>>;
 type Writer = SplitSink<Framed<TcpStream, FtpCodec>>;
+
+ const MONTHS: [&'static str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 
 fn get_parent(path: PathBuf) -> Option<PathBuf> {
@@ -58,6 +60,61 @@ fn get_parent(path: PathBuf) -> Option<PathBuf> {
 fn get_filename(path: PathBuf) -> Option<OsString> {
     path.file_name().map(|p| p.to_os_string())
 }
+
+#[cfg(windows)]
+fn get_file_info(meta: &Metadata) -> (time::Tm, u64) {
+    use std::os::windows::prelude::*;
+    (time::at(time::Timespec::new((meta.last_write_time() / 10_000_000) as i64, 0)),
+              meta.file_size())
+}
+#[cfg(not(windows))]
+fn get_file_info(meta: &Metadata) -> (time::Tm, u64) {
+    use std::os::unix::prelude::*;
+    (time::at(time::Timespec::new(meta.mtime(), 0)), meta.size())
+}
+
+// If an error occurs when we try to get file's information, we just return and don't send its info.
+fn add_file_info(path: PathBuf, out: &mut Vec<u8>) {
+    let extra = if path.is_dir() { "/" } else { "" };
+    let is_dir = if path.is_dir() { "d" } else { "-" };
+
+    let meta = match ::std::fs::metadata(&path) {
+        Ok(meta) => meta,
+        _ => return,
+    };
+    let (time, file_size) = get_file_info(&meta);
+    let path = match path.to_str() {
+        Some(path) => match path.split("/").last() {
+            Some(path) => path,
+            _ => return,
+        },
+        _ => return,
+    };
+    // TODO: maybe improve how we get rights in here?
+    let rights = if meta.permissions().readonly() {
+        "r--r--r--"
+    } else {
+        "rw-rw-rw-"
+    };
+    let file_str = format!("{is_dir}{rights} {links} {owner} {group} {size} {month} {day} {hour}:{min} {path}{extra}\r\n",
+                           is_dir=is_dir,
+                           rights=rights,
+                           links=1, // number of links
+                           owner="anonymous", // owner name
+                           group="anonymous", // group name
+                           size=file_size,
+                           month=MONTHS[time.tm_mon as usize],
+                           day=time.tm_mday,
+                           hour=time.tm_hour,
+                           min=time.tm_min,
+                           path=path,
+                           extra=extra);
+    out.extend(file_str.as_bytes());
+    println!("==> {:?}", &file_str);
+}
+
+
+
 
 struct Client {
     data_port: Option<u16>,
@@ -69,6 +126,8 @@ struct Client {
     transfer_type: TransferType,
     writer: Writer,
 }
+
+
 
 impl Client {
     fn new(handle: Handle, writer: Writer, server_root: PathBuf) -> Client {
@@ -215,51 +274,26 @@ impl Client {
         if let Some(writer) = self.data_writer {
             self.data_writer = Some(await!(writer.send(data))?);
         }
-        Ok(self);
+        Ok(self)
     }
 
     fn close_data_connection(&mut self) {
         self.data_reader = None;
         self.data_writer = None;
     }
-    const MONTHS: [&'static str; 12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-    fn add_file_info(path: PathBuf, out: &mut Vec<u8>) {
-        let extra = if path.is_dir() {"/"} else {""};
-        let is_dir = if path.is_dir() {"d"}  else {"-"};
-        let meta = match ::std::fs::metadata(&path) {
-            Ok(meta) => path,
-            _=> return,
-        },
-        _=>return,
-    };
-    let rights = if meta.permissions().readonly() {
-        "r--r--r--"
-    } else {
-        "rw-rw-rw-"
-    };
-    let file_str = format!("{is_dir}{rights} {links} {owner} {group} {size} {month} {day} {hour}:{min} {path}{extra}\r\n", is_dir=is_dir, rights=rights, links=1,
-                           owner="anonymous",
-                           group="anonymous",
-                           month=MONTS[time.tm_mon as usize],
-                           day=time.tm_mday,
-                           hour=time.tm_hour,
-                           min=time.tm_min,
-                           path=path,
-                           extra=extra);
-    out.extend(file_str.as_bytes());
-    println!("==> {:?}", &file_str);
 
-}
+
+
 #[async]
 fn list(mut self, path: Option<PathBuf>) -> Result<Self> {
     if self.data_writer.is_some() {
         let path = self.cwd.join(path.unwrap_or_default());
         let directory = PathBuf::from(&path);
         let (new_self, res) = self.complete_path(directory);
-        self = ne_self;
+        self = new_self;
         if  let Ok(path) = res {
-            self = await!(self.send(Answer::new(ResultCode::DataConnectionAlreadyOpen, "Starting to list directory...")));
+            self = await!(self.send(Answer::new(ResultCode::DataConnectionAlreadyOpen, "Starting to list directory...")))?;
 
             let mut out = vec![];
             if path.is_dir() {
@@ -274,12 +308,13 @@ fn list(mut self, path: Option<PathBuf>) -> Result<Self> {
                     return Ok(self);
                 }
             } else {
-                add_file_info(entry.path(),&mut out);
+                add_file_info(path,&mut out);
             }
             self = await!(self.send_data(out))?;
             println!("-> and done!");
         } else {
-            self = await!(self.send(Answer::new(ResultCode::InvalidParameterOrArgument)))?;
+                self = await!(self.send(Answer::new(ResultCode::InvalidParameterOrArgument,
+                                                    "No such file or directory")))?;
         }
     } else {
         self = await!(self.send(Answer::new(ResultCode::ConnectionClosed, "No opened data connection")))?;
@@ -288,19 +323,7 @@ fn list(mut self, path: Option<PathBuf>) -> Result<Self> {
         self.close_data_connection();
         self = await!(self.send(Answer::new(ResultCode::ClosingDataConnection, "Transfer done")))?;
     }
-    Ok(self);
-}
-
-#[cfg(windows)]
-fn get_file_info(meta: &Metadata) -> (time::Tm, u64) {
-    use std::os::windows::prelude::*;
-    (time::at(time::Timespec::new(meta.last_write_time())),
-    meta.file_size())
-}
-#[cfg(not(windows))]
-fn get_file_info(meta: &Metadata) -> (time::Tm, u64) {
-    use std::os::unix::prelude::*;
-    (time::at(time::Timespec::new(meta.mtime(), 0)), meta.size())
+    Ok(self)
 }
 
 #[async]
@@ -341,7 +364,6 @@ fn handle_cmd(mut self, cmd: Command) -> Result<Self> {
     return Ok(self);
 }
 }
-
 
 
 #[async]
@@ -392,6 +414,4 @@ fn main() {
         Err(e) => println!("Could not start server: {:?}",e),
 
     }
-
-
 }
