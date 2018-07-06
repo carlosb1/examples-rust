@@ -31,12 +31,12 @@ fn main () {
         p2: Point {x: 3.0, y: 4.0}
     };
     //Heap allocated rectangle
-    let boxed_rectangle: Box<Rectangle> = Box::New(Rectangle {
+    let boxed_rectangle: Box<Rectangle> = Box::new(Rectangle {
         p1: origin(),
         p2: origin()
     });
 
-    let boxed_point = Box<Point> = Box::new(origin());
+    let boxed_point:  Box<Point> = Box::new(origin());
 
     let box_in_a_box: Box<Box<Point>> = Box::new(boxed_origin());
 
