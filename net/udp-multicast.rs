@@ -7,11 +7,9 @@ fn main() {
     let any = "0.0.0.0".parse().unwrap();
     let mut buffer = [0u8; 1600];
     if env::args().count() > 1 {
-            let socket = UdpSocket::bind((any, port))
-                .expect("Could not bind client socket");
-            socket.join_multicast_v4(&mcast_group, &any)
-                .expect("Could not join multicast group");
-            socket.recv_from("Failed to write to server");
+            let socket = UdpSocket::bind((any, port)).expect("Could not bind client socket");
+            socket.join_multicast_v4(&mcast_group, &any).expect("Could not join multicast group");
+            socket.recv_from(&mut buffer).expect("Failed to write to server");
             print!("{}", str::from_utf8(&buffer).expect("Could not write buffer as string"));
 
     } else {
