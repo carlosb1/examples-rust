@@ -1,0 +1,9 @@
+[package]
+name = "hyper-server"
+version = "0.1.0"
+authors = ["Carlos B <carlos.baezruiz@gmail.com>"]
+
+[dependencies]
+hyper="0.11.7"
+futures = "0.1.17"
+
