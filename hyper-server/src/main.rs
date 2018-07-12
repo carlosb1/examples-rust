@@ -1,4 +1,4 @@
-extern crate hyper:
+extern crate hyper;
 extern crate futures;
 
 use std::{thread, time};
@@ -21,15 +21,22 @@ impl Service for Echo {
     type Response = Response;
     type Error = hyper::Error;
     type Future = FutureResult<Response, hyper::Error>;
-}
-/*
+
 fn call(&self, req: Request) -> Self::Future {
-    futures::future::ok(match(req.method(), req.path())) {
-    
+    futures::future::ok(match(req.method(), req.path()) {
+        (&Get, "/data") => {
+            let b = heavy_work().into_bytes();
+            Response::new().with_header(ContentLength(b.len() as u64))
+                .with_body(b)
+        }
+        _=> Response::new().with_status(StatusCode::NotFound),})
+
     }
 }
-*/
+
 
 fn main() {
-    println!("Hello, world!");
+    let addr = "0.0.0.0:3000".parse().unwrap();
+    let server = Http::new().bind(&addr, || Ok(Echo)).unwrap();
+    server.run().unwrap();
 }
