@@ -4,7 +4,7 @@
 extern crate rocket;
 
 #[get("/")]
-fn blast_off() -> &-static str {
+fn blast_off() -> &'static str {
     "Hello, Rocket!"
 }
 
