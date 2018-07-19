@@ -13,7 +13,9 @@ lazy_static! {
         r2d2::Pool<ConnectionManager<SqliteConnection>> = {
                 dotenv().ok();
                 let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
                 let config = r2d2::Config::builder().pool_size(32).build();
+                
                 let manager = ConnectionManager::<SqliteConnection>:new(database_url);
                 r2d2::Pool::new(config, manager).expect("Failed to create pool.")
         };
