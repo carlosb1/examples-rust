@@ -12,7 +12,7 @@ pub enum ApiError {
     InternalServerError,
 }
 
-impl fmt:Display for ApiError {
+impl fmt::Display for ApiError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ApiError::NotFound => f.write_str("NotFound"),
