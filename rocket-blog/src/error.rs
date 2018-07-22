@@ -17,7 +17,6 @@ impl fmt::Display for ApiError {
         match *self {
             ApiError::NotFound => f.write_str("NotFound"),
             ApiError::InternalServerError => f.write_str("InternalServerError"),
-
         }
     }
 }
@@ -40,11 +39,12 @@ impl Error for ApiError {
     }
 }
 
+
 impl<'r> Responder<'r> for ApiError {
     fn respond_to(self, _request: &Request) -> Result<Response<'r>, Status> {
         match self {
-            ApiError::NotFound => Err(Status::NotFound), 
-            _=> Err(Status::InternalServerError),
+            ApiError::NotFound => Err(Status::NotFound),
+            _ => Err(Status::InternalServerError),
         }
     }
 }
