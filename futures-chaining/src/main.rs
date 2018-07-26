@@ -20,7 +20,7 @@ fn player_one() -> &'static str {
 fn player_two() -> &'static str {
     let d = thread_rng().gen_range::<u64>(1, 5);
     thread::sleep(Duration::from_secs(d));
-    "player two"
+    "player_two"
 }
 
 fn main() {
