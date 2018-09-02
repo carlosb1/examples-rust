@@ -1,0 +1,7 @@
+[package]
+name = "pencil-hello"
+version = "0.1.0"
+authors = ["Carlos B <carlos.baezruiz@gmail.com>"]
+
+[dependencies]
+pencil = "0.3.0"
