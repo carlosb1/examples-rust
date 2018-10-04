@@ -1,2 +1,1 @@
-docker run -d --hostname my-rabbit --name some-rabbit rabbitmq:3
-docker logs some-rabbit
+docker run -ti -p 1883:1883 -p 9001:9001 toke/mosquitto
