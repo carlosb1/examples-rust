@@ -13,8 +13,8 @@ use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
 
-// extern crate diesel_demo;
-//  use self::diesel_demo::*;
+extern crate hello_rocket;
+use self::hello_rocket::*;
 use self::models::*;
 use self::diesel::prelude::*;
 
@@ -64,17 +64,15 @@ fn main() {
     rocket::ignite().mount("/hero", routes![create, update, delete])
         .mount("/heroes", routes![read]).launch();
     use diesel_demo::schema::posts::dsl::*;
-    // let connection = establish_connection();
-    // let results = posts.filter(published.eq(true)).limit(5).load::<Post>(&connection).expect("Error loading posts");
+    let connection = establish_connection();
+    let results = posts.filter(published.eq(true)).limit(5).load::<Post>(&connection).expect("Error loading posts");
 
-    /*
     println!("Displaying {} posts",results.len());
     for post in results {
         println!("{}", post.title);
-        println!("---------------\n")
+        println!("---------------\n");
         println!("{}", post.body);
     }
-    */
 }
 
 
