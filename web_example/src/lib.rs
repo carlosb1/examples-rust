@@ -6,12 +6,12 @@ pub mod schema;
 pub mod models;
 
 use diesel::prelude::*;
-use diesel::pg::PgConnetion;
+use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
 
-pub fn establish_connection () -> PgConnetion {
+pub fn establish_connection () -> PgConnection {
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    PgConnetion::establish(&database_url).expect(&format!("Error connecting to {}", database_url));
+    return PgConnection::establish(&database_url).expect(&format!("Error connecting to {}", database_url));
 }
