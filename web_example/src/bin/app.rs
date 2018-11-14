@@ -41,6 +41,31 @@ fn index() -> &'static str {
     return("Hello, world!");
 }
 
+#[post("/<id>", format="json", data="<message>")]
+fn new(id: ID, message: Json<Message>, map: State<MessageMap>) -> JsonValue{
+    let mut hashmap = map.lock().expect("map lock.");
+    if hashmap.contains_key(&id) {
+        return(JsonValue(json!({
+            "status": "error",
+            "reason": "ID exists. Try put."})));
+    } else  {
+        hashmap.insert(id, message.0.contents);
+        return(JsonValue(json!({"status": "ok"})));
+    }
+}
+
+#[put("/<id>", format = "json", data="<message>")]
+fn update(id: ID, message: Json<Message>, map: State<MessageMap>) -> Option<JsonValue> {
+    let mut hashmap = map.lock().unwrap();
+    if hashmap.contains_key(&id) {
+        hashmap.insert(id, message.0.contents);
+        return(Some(JsonValue(json!({"status" : "ok"}))));
+    } else {
+        return(None);
+    }
+}
+
+
 #[catch(404)]
 fn not_found() -> JsonValue {
     JsonValue(json!({
@@ -50,5 +75,5 @@ fn not_found() -> JsonValue {
 }
 
 fn main () {
-    rocket::ignite().mount("/", routes![index, get]).register(catchers![not_found]).manage(Mutex::new(HashMap::<ID, String>::new())).launch();
+    rocket::ignite().mount("/", routes![index, get, new, update]).register(catchers![not_found]).manage(Mutex::new(HashMap::<ID, String>::new())).launch();
 }
