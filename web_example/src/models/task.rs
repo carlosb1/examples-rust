@@ -1,3 +1,5 @@
+
+
 #[derive(Queryable)]
 pub struct Task {
     pub id:i32,
@@ -6,4 +8,4 @@ pub struct Task {
     pub done: bool,
 }
 
-use super::schema::tasks;
+use schema::tasks;

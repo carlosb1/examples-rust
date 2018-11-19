@@ -27,12 +27,12 @@ struct Message {
 #[get("/<id>", format="json")]
 fn get(id: ID, map: State<MessageMap>) -> Option<Json<Message>> {
     let hashmap = map.lock().unwrap();
-    hashmap.get(&id).map(|contents| {
+    return(hashmap.get(&id).map(|contents| {
         Json(Message {
                 id: Some(id),
                 contents: contents.clone()
             })
-    })
+    }));
 }
 
 
@@ -64,7 +64,6 @@ fn update(id: ID, message: Json<Message>, map: State<MessageMap>) -> Option<Json
         return(None);
     }
 }
-
 
 #[catch(404)]
 fn not_found() -> JsonValue {
