@@ -8,4 +8,3 @@ pub struct Task {
     pub done: bool,
 }
 
-use schema::tasks;
