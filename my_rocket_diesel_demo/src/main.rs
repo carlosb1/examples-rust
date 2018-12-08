@@ -1,64 +1,60 @@
-#![feature(plugin)]
+#![feature(plugin, custom_attribute, uniform_paths)]
+#![allow(proc_macro_derive_resolution_fallback)]
 #![plugin(rocket_codegen)]
 extern crate rocket;
 #[macro_use]
-extern crate diesel;
-#[macro_use]
-extern crate diesel_codegen;
-extern crate dotenv;
 extern crate serde_json;
-#[macro_use]
-extern crate lazy_static;
 extern crate rocket_contrib;
 #[macro_use]
 extern crate serde_derive;
-extern crate r2d2;
-extern crate r2d2_diesel;
+#[macro_use]
+extern crate diesel;
+extern crate dotenv;
+
+
 
 mod schema;
 mod db;
-mod post;
 mod models;
 mod error;
 
-use db::{establish_connection};
+use db::DB;
 use models::{Task, NewTask};
-use rocket_contrib::Json;
-use rocket::response::status::{Created, NoContent};
+use rocket_contrib::{Json, Value};
 use rocket::Rocket;
+use error::ApiError;
 
 #[get("/tasks", format = "application/json")]
-fn tasks_get(db: PgConnection) -> Result<Json<Vec<Post>>, ApiError> {
+fn tasks_get(db: DB) -> Result<Json<Vec<Task>>, ApiError> {
     Ok(Json(Task::read(&db)))
 }
 
 #[get("/tasks/<id>", format = "application/json")]
-fn task_get(db: PgConnection, id: i32) -> Result<Json<Post>, ApiError> {
- //   let post = Task::read(&db, id)?;
- //   Ok(Json(post))
-}
-
-#[post("/tasks", format = "application/json", data = "<post>")]
-fn task_create(db: PgConnection,  task: NewTask) -> Result<Created<String>, ApiError> {
-    let post = Task::create(task &db);
-    let url = format!("/task/{}", task);
-    Ok(Created(url, Some("Done".to_string())))
-}
-
-#[patch("/tasks/<id>", format = "application/json", data = "<post>")]
-fn task_edit(db: PgConnection, id: i32, task: NewTask) -> Result<Json<bool>, ApiError> {
-    let post = Task::update(post,id, &db);
+fn task_get(db: DB, id: i32) -> Result<Json<Task>, ApiError> {
+    let post = Task::get(&db, id);
     Ok(Json(post))
 }
 
+#[post("/tasks", format = "application/json", data = "<task>")]
+fn task_create(db: DB,  task: NewTask) -> Result<Json<Task>, ApiError> {
+    let new_task = Task::create(task, &db);
+    Ok(Json(new_task))
+}
+
+#[patch("/tasks/<id>", format = "application/json", data = "<task>")]
+fn task_edit(db: DB, id: i32, task: NewTask) -> Result<Json<bool>, ApiError> {
+    let new_task = Task::update(task,id, &db);
+    Ok(Json(new_task))
+}
+
 #[delete("/tasks/<id>")]
-fn task_delete(db: PgConnection, id: i32) -> Result<NoContent, ApiError> {
-    Task::delete(id, &db)?;
-    Ok(NoContent)
+fn task_delete(db: DB, id: i32) -> Result<Json<Value>, ApiError> {
+    let json_result = Json(json!({"success": Task::delete(id, &db)}));
+    Ok(json_result)
 }
 
 fn rocket() -> Rocket {
-    rocket::ignite().manage(db::connect()).mount("/", routes![post_create, posts_get, post_delete, post_edit, post_get])
+    rocket::ignite().manage(db::init_pool()).mount("/", routes![task_create, task_delete, task_edit, tasks_get, task_get])
 }
 
 fn main() {
