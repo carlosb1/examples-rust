@@ -12,14 +12,10 @@ extern crate lazy_static;
 extern crate rocket_contrib;
 #[macro_use]
 extern crate serde_derive;
-extern crate r2d2;
-extern crate r2d2_diesel;
 
 mod schema;
 mod db;
-mod post;
 mod models;
-mod error;
 
 use db::DB;
 use post::{get_posts, get_post, create_post, delete_post, update_post};

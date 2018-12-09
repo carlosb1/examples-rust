@@ -1,7 +1,0 @@
-[package]
-name = "client_mq"
-version = "0.1.0"
-authors = ["Carlos B <carlos.baezruiz@gmail.com>"]
-
-[dependencies]
-mosquitto-client="0.1.5"

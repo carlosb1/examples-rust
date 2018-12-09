@@ -14,7 +14,7 @@ fn hello_template(request: &mut Request) -> PencilResult {
 
 fn main() {
     let mut app = Pencil::new("/web/hello");
-    app.enable_static_file_handling();
+    //app.enable_static_file_handling();
     app.register_template("hello.html");
     app.get("/hello_template", "hello_template", hello_template)
     //app.get("/", "hello", hello);

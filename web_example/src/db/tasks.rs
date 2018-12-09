@@ -35,7 +35,6 @@ pub struct FindTasks {
 }
 
 pub fn find(conn:: &PgConnection, params: FindTasks) -> Vec<TaskJson> {
-    // let mut query = tasks::table.select().into_boxed
-    // let result = query.limit();
+        
 }
 
