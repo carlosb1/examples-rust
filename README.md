@@ -21,5 +21,14 @@ Playing with Rust language...
 - web_example -> Example web in Rocket + Diesel
 - websocket-chat -> Example with Activx with websockets
 
+# resources
+
+- https://github.com/huytd/codedaily-v3 (frontend / backend rust http service)
+- https://github.com/KallDrexx/rust-media-libs
+- https://github.com/BlakeGilstrap/Rust-webapp-starter
+- https://github.com/tomaka/rustfest-2018-workshop
+- https://github.com/huytd/hackernews-rss-reader
+- https://github.com/emk/heroku-rust-cargo-hello
+- https://github.com/carlosb1/rustwebapp
 
 
