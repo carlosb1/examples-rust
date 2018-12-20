@@ -30,5 +30,6 @@ Playing with Rust language...
 - https://github.com/huytd/hackernews-rss-reader
 - https://github.com/emk/heroku-rust-cargo-hello
 - https://github.com/carlosb1/rustwebapp
+- https://github.com/hermitcore/libhermit-rs
 
 
