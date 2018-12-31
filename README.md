@@ -31,5 +31,6 @@ Playing with Rust language...
 - https://github.com/emk/heroku-rust-cargo-hello
 - https://github.com/carlosb1/rustwebapp
 - https://github.com/hermitcore/libhermit-rs
+- https://github.com/TatriX/realworld-rust-rocket
 
 
