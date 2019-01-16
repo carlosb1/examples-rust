@@ -4,12 +4,13 @@ extern crate capnp_rpc;
 #[macro_use]
 extern crate gj;
 extern crate gjio;
+
 pub mod hello_capnp {
     include!(concat!(env!("OUT_DIR"), "/hello_capnp.rs"));
 }
 
-pub mod client;
 pub mod server;
+pub mod client;
 
 fn main() {
     let args: Vec<String> = ::std::env::args().collect();
@@ -17,9 +18,7 @@ fn main() {
         match &args[1][..] {
             "client" => return client::main(),
             "server" => return server::main(),
-            _ => ()
+            _ => (),
         }
     }
 }
-
-
