@@ -1,7 +1,6 @@
 use std::io::{self, BufRead};
 
-fn main() {
-    //println!("Hello, world!");
+fn code1() {
     let stdin = io::stdin();
 
     let mut lines = stdin.lock().lines().fuse();
@@ -19,4 +18,8 @@ fn main() {
         result += num;
     }
     println!("{:?}", result); 
+}
+
+fn main() {
+    code1();
 }
