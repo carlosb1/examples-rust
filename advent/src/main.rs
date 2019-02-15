@@ -36,7 +36,6 @@ fn code2() {
         }
         vec.push(str_line);
     }
-   
         
     let mut saved_characters: HashMap<String, i32> = HashMap::new();
     for info in &vec { 
@@ -56,8 +55,34 @@ fn code2() {
     println!("twos: {}", two);
 }
 
+fn paint_matrix(matrix: &mut [[&str; 10]; 10]) {
+    for (i, row) in  matrix.iter_mut().enumerate() {
+        for (y, col) in row.iter_mut().enumerate() {
+             print!("{}", col);  
+        }
+        println!();
+    }
+}
+
+fn code3() {
+    let mut vec: Vec<String> = Vec::new();
+
+    let stdin = io::stdin();
+    for line in stdin.lock().lines() {
+        let str_line = line.unwrap().trim().to_string();
+        if str_line == "0" {
+            println!("exit!");
+            break;
+        }
+        vec.push(str_line);
+    }
+    let mut matrix = [["."; 10];10];
+    paint_matrix(&mut matrix);  
+}
+
 
 fn main() {
     //code1();
-    code2();
+    //code2();
+    code3();
 }
