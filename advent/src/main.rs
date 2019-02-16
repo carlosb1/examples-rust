@@ -1,5 +1,14 @@
+extern crate regex;
+
 use std::io::{self, BufRead};
 use std::collections::HashMap;
+
+pub struct Entry {
+    index_x: i32,
+    index_y: i32,
+    width: i32,
+    height: i32
+}
 
 fn code1() {
     let stdin = io::stdin();
@@ -55,6 +64,9 @@ fn code2() {
     println!("twos: {}", two);
 }
 
+
+static DEFAULT: &str = ".";
+
 fn paint_matrix(matrix: &mut [[&str; 10]; 10]) {
     for (i, row) in  matrix.iter_mut().enumerate() {
         for (y, col) in row.iter_mut().enumerate() {
@@ -65,6 +77,8 @@ fn paint_matrix(matrix: &mut [[&str; 10]; 10]) {
 }
 
 fn code3() {
+    use regex::Regex;
+    let re = Regex::new(r"^#\d @ \d,\d: \dx\d").unwrap();
     let mut vec: Vec<String> = Vec::new();
 
     let stdin = io::stdin();
@@ -76,8 +90,16 @@ fn code3() {
         }
         vec.push(str_line);
     }
-    let mut matrix = [["."; 10];10];
-    paint_matrix(&mut matrix);  
+    // check input
+    for line in vec {
+        println!("{:?}", re.is_match(line.as_str()));
+        let cap = re.captures(line.as_str()).unwrap();
+        println!("{:?}",&cap[0]);
+    }
+
+    let mut matrix = [[DEFAULT; 10];10];
+    paint_matrix(&mut matrix);
+
 }
 
 
