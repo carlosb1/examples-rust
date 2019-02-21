@@ -1,10 +1,10 @@
 extern crate regex;
+extern crate chrono;
 
 use std::io::{self, BufRead};
 use std::collections::HashMap;
 use std::fmt;
-
-
+use chrono::prelude::*;
 
 fn code1() {
     let stdin = io::stdin();
@@ -156,30 +156,36 @@ fn code3() {
 
 }
 
+
+
 #[derive(PartialEq, Clone)]
 enum Event {
     Shift,
     Asleep,
     Wakeup
-} 
+}
 
 pub struct SoldierEvent {
     event: Event,
     num_worker: i32,
-    year: i32,
-    month: i32,
-    day: i32,
-    hour: i32,
-    minutes: i32
-
+    dt: DateTime<Utc>
 }
 impl SoldierEvent  {
     fn new( event: Event, num_worker: i32, year: i32, month: i32, day: i32, hour: i32, minutes: i32) -> SoldierEvent {
-        SoldierEvent {event: event, num_worker: num_worker, year: year, month: month, day: day, hour: hour, minutes: minutes}
+        let dt = Utc.ymd(year, month as u32, day as u32).and_hms(hour as u32, minutes as u32, 0);
+        SoldierEvent {event: event, num_worker: num_worker,  dt: dt}
     }
 
 }
 
+pub struct Soldier {
+}
+
+impl Soldier {
+    fn addEvent(&self, event: Event) {
+             
+    }
+}
 
 fn code4 () {
     use regex::Regex;
