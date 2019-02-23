@@ -179,12 +179,14 @@ impl SoldierEvent  {
 }
 
 pub struct Soldier {
+    events: Vec<SoldierEvent>
 }
 
 impl Soldier {
-    fn addEvent(&self, event: Event) {
-             
+    fn addEvent(& mut self, event: SoldierEvent) {
+        self.events.push(event);         
     }
+
 }
 
 fn code4 () {
