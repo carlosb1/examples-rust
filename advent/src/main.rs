@@ -165,31 +165,56 @@ enum Event {
     Wakeup
 }
 
-pub struct SoldierEvent {
-    event: Event,
-    num_worker: i32,
-    dt: DateTime<Utc>
-}
-impl SoldierEvent  {
-    fn new( event: Event, num_worker: i32, year: i32, month: i32, day: i32, hour: i32, minutes: i32) -> SoldierEvent {
-        let dt = Utc.ymd(year, month as u32, day as u32).and_hms(hour as u32, minutes as u32, 0);
-        SoldierEvent {event: event, num_worker: num_worker,  dt: dt}
-    }
-
+#[derive(PartialEq, Clone)]
+pub struct SleepEvent  {
+    start_sleep: i64,
+    stop_sleep: i64,
+    quantity: i32
 }
 
 pub struct Soldier {
-    events: Vec<SoldierEvent>
+    num: i32,
+    status: Event,
+    start_sleep: Option<DateTime<Utc>>,
+    events: Vec<SleepEvent>
 }
 
 impl Soldier {
-    fn addEvent(& mut self, event: SoldierEvent) {
-        self.events.push(event);         
+    fn new(num: i32) -> Soldier {
+        Soldier{ num: num, status: Event::Wakeup, start_sleep: None, events: Vec::new()}
     }
 
+    fn add_event(& mut self, event: Event, year: i32, month: i32, day: i32, hour: i32, minutes: i32) {
+        println!("id: {}", self.num);
+        let dt = Utc.ymd(year, month as u32, day as u32).and_hms(hour as u32, minutes as u32, 0);
+     //   self.events.push(event);
+        match  event {
+            Event::Asleep => {
+                println!("Asleep {}", dt.timestamp());
+                self.start_sleep = Some(dt);
+            },
+            Event::Wakeup => {
+                let stop_sleep = dt;
+                let quantity = (stop_sleep.timestamp() - self.start_sleep.unwrap().timestamp()) as i32;
+                let sleepEvent: SleepEvent = SleepEvent{start_sleep: self.start_sleep.unwrap().timestamp(), stop_sleep: stop_sleep.timestamp(), quantity: quantity};
+                self.events.push(sleepEvent);
+            },
+            _ => {
+                println!("Other event");
+            }
+        }
+    }
+    fn contains_event(&mut self, moment_sleep: i32) -> Option<SleepEvent> {
+        let bestSleep = self.events.iter().filter(|x| x.start_sleep >= moment_sleep as i64 || x.stop_sleep <= moment_sleep as i64).min_by_key(|x| x.quantity);
+        match bestSleep {
+            Some(x) => return Some(x.clone()),
+            None => return None
+        }
+    }
 }
 
 fn code4 () {
+    
     use regex::Regex;
     let mut re_shift = Regex::new(r"^\[(\d{4})\-(\d{2})\-(\d{2}) (\d{2}):(\d{2})\] Guard #(\d{2}) begins shift").unwrap();
     let mut re_fall_sleeps = Regex::new(r"^\[(\d{4})\-(\d{2})\-(\d{2}) (\d{2}):(\d{2})\] falls asleep").unwrap();
@@ -207,9 +232,13 @@ fn code4 () {
         vec.push(str_line);
     }
     // check input
-    let mut entries: Vec<SoldierEvent> = Vec::new();
+    //let mut entries: Vec<SoldierEvent> = Vec::new();
+    
+    
+    let mut soldiers: HashMap<i32, Soldier> = HashMap::new();
+
+    let mut current_soldier = -1;
     for line in vec {
-        let mut current_soldier = -1;
         let typ: Event;
         let re;
         if (re_shift.is_match(line.as_str())) {
@@ -228,14 +257,15 @@ fn code4 () {
             let month: i32 = cap[2].parse::<i32>().unwrap();
             let day: i32 = cap[3].parse::<i32>().unwrap();
             let hour: i32 = cap[4].parse::<i32>().unwrap();
-            let minutes: i32 = cap[5].parse::<i32>().unwrap();
+            let minutes: i32 = cap[5].parse::<i32>().unwrap(); 
             if(typ == Event::Shift) {
                 current_soldier = cap[6].parse::<i32>().unwrap();
+                soldiers.entry(current_soldier).or_insert(Soldier::new(current_soldier));
             }
-            entries.push(SoldierEvent::new(typ.clone(), current_soldier, year, month, day, hour, minutes));  
+            let soldier = soldiers.get_mut(&current_soldier).unwrap();
+            soldier.add_event(typ.clone(), year, month, day, hour, minutes);
         }
     }
-    println!("events {:}", entries.len());
 
     //TODO Finish code to search best sentynel
 }
