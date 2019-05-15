@@ -1,18 +1,13 @@
 [target.aarch64-linux-android]
-ar = "<project path>/greetings/NDK/arm64/bin/aarch64-linux-android-ar"
-linker = "<project path>/greetings/NDK/arm64/bin/aarch64-linux-android-clang"
+ar = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/arm64/bin/aarch64-linux-android-ar"
+linker = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/arm64/bin/aarch64-linux-android-clang"
 
 [target.armv7-linux-androideabi]
-ar = "<project path>/greetings/NDK/arm/bin/arm-linux-androideabi-ar"
-linker = "<project path>/greetings/NDK/arm/bin/arm-linux-androideabi-clang"
+ar = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/arm/bin/arm-linux-androideabi-ar"
+linker = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/arm/bin/arm-linux-androideabi-clang"
 
 [target.i686-linux-android]
-ar = "<project path>/greetings/NDK/x86/bin/i686-linux-android-ar"
-linker = "<project path>/greetings/NDK/x86/bin/i686-linux-android-clang"
+ar = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/x86/bin/i686-linux-android-ar"
+linker = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/x86/bin/i686-linux-android-clang"
 
-# cp cargo-config.toml ~/.cargo/config
-# rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android
-
-# cargo new cargo
-# mkdir android
 
