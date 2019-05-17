@@ -4,10 +4,11 @@ linker = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/arm64/b
 
 [target.armv7-linux-androideabi]
 ar = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/arm/bin/arm-linux-androideabi-ar"
-linker = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/arm/bin/arm-linux-androideabi-clang"
+linker = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/arm/bin/arm-linux-androideabi28-clang"
 
 [target.i686-linux-android]
 ar = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/x86/bin/i686-linux-android-ar"
-linker = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/x86/bin/i686-linux-android-clang"
+linker = "/home/carlosb/rust-workspace/examples-rust/android_example/NDK/x86/bin/i686-linux-android28-clang"
+
 
 
