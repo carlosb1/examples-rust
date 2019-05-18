@@ -86,6 +86,18 @@ aws apigateway create-deployment \
 
 [ $? == 0 ] || fail 6 "Failed: AWS / apigateway / create-deployment"
 
+
+#APIARN=$(echo ${LAMBDA_ARN} | sed -e 's/lambda/execute-api/' -e "s/function:${NAME}/${API_ID}/")
+#echo "Updating Lambda to be executable by API..."
+#aws lambda add-permission \
+#	--function-name "$NAME" \
+#	--statement-id "api-$REST_API_ID-$RESOURCE_ID" \
+#	--action lambda:InvokeFunction \
+#	--principal apigateway.amazonaws.com \
+#    --source-arn "${APIARN}/*/*/${API_NAME}" \
+#    --region ${REGION} \
+
+
 ENDPOINT=https://${API_ID}.execute-api.${REGION}.amazonaws.com/${STAGE}/${API_NAME}
 
 echo "API available at: ${ENDPOINT}"
