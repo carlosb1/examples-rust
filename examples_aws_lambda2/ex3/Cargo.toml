@@ -9,3 +9,12 @@ edition = "2018"
 [dependencies]
 reqwest="0.9.17"
 select="0.4.2"
+dynomite-derive = "0.4.1"
+dynomite = "0.4.1"
+log = "0.4"
+failure = "0.1"
+futures = "0.1"
+futures-backoff = "0.1"
+rusoto_core = "0.38"
+uuid = { version = "0.7", features = ["v4"]}
+tokio = "0.1"
