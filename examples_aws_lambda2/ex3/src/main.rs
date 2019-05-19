@@ -1,3 +1,12 @@
+#[macro_use]
+extern crate lambda_runtime as lambda;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate log;
+extern crate simple_logger;
+
+
 extern crate reqwest;
 extern crate select;
 extern crate dynomite;
@@ -7,6 +16,11 @@ mod db;
 
 use select::document::Document;
 use select::predicate::{Class, Name, Predicate};
+use lambda::error::HandlerError;
+
+use std::error::Error;
+
+
 
 
 static NAME_ID: &'static str  = "id";
@@ -14,32 +28,31 @@ static NAME_TABLE: &'static str  = "test";
 
 
 
-
-fn main() -> Result<(), Box<std::error::Error>> {
-    
-    let client = db::DummyClientDB::new(NAME_ID.to_string(), NAME_TABLE.to_string());
-    let test= db::Test::new("45".to_string(), "param1".to_string());
-    let result_put = client.clone().put(&test);
-    println!("{:#?}", result_put);
-
-    let result_get = client.clone().get("45");
-    println!("{:#?}", result_get);
-
-    let results = client.clone().list();
-    println!("{:#?}",results);
-    Ok(()) 
+#[derive(Deserialize, Clone)]
+struct CustomEvent {
 }
 
+#[derive(Serialize, Clone)]
+struct CustomOutput {
+    message: String,
+}
 
-
-fn scrap_news() -> Result<(), Box<std::error::Error>>  {
-    let web_news = "https://www.lavanguardia.com/internacional/20190518/462299498579/iran-eeuu-armada-china-golfo-persico.html";
-    let resp = reqwest::get(web_news)?.text()?;
-    let document = Document::from(resp.as_str());
-    let to_parse_text = document.find(Class("content-structure")).next().unwrap().text();
+fn main() -> Result<(), Box<dyn Error>> {
+    simple_logger::init_with_level(log::Level::Info)?;
+    lambda!(my_handler);
     Ok(())
 }
-fn hacker_news(url: &str) {
+
+fn my_handler(e: CustomEvent, c: lambda::Context) -> Result<CustomOutput, HandlerError> {
+    let client = db::DummyClientDB::new(NAME_ID.to_string(), NAME_TABLE.to_string());
+    check_news("https://news.ycombinator.com", client);
+    Ok(CustomOutput {
+        message: format!("inserted"),
+    })
+}
+
+
+fn check_news(url: &str, client: db::DummyClientDB) {
     let resp = reqwest::get(url).unwrap();
     assert!(resp.status().is_success());
     let document = Document::from_read(resp).unwrap();
@@ -54,8 +67,10 @@ fn hacker_news(url: &str) {
             .next()
             .unwrap();
         let url_txt = url.attr("href").unwrap();
-        let url_trim = url_txt.trim_left_matches('/');
+        //let url_trim = url_txt.trim_left_matches('/');
         println!("rank {} story {} url {}", rank.text(), story, url_txt);
+        let news = db::News::new(url_txt.to_string(), story.to_string());
+        client.clone().put(&news);
 
     }
 }
