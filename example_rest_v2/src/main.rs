@@ -18,10 +18,9 @@ struct HelloWorldCase {
 
 impl UseCase for HelloWorldCase {
     fn run(&self) -> &'static str {
-        "hello world case"
+        "Hello world"
     }
 }
-
 
 impl<'a, 'r> FromRequest<'a, 'r> for HelloWorldCase {
     type Error = ();
@@ -30,10 +29,9 @@ impl<'a, 'r> FromRequest<'a, 'r> for HelloWorldCase {
     }
 }
 
-
 #[get("/")]
-fn hello(use_case: HelloWorldCase) -> &'static str {
-    use_case.run()
+fn hello() -> &'static str {
+    HelloWorldCase{}.run()
 }
 
 fn main() {
@@ -42,14 +40,12 @@ fn main() {
 }
 
 
-
 #[test]
 fn test1() {
     use rocket::local::Client;
     let use_case = HelloWorldCase{};
-    let rocket = rocket::ignite().manage(use_case).mount("/", routes![hello]);
+    let rocket = rocket::ignite().mount("/", routes![hello]);
     let client = Client::new(rocket).unwrap();
     let mut response = client.get("/").dispatch();
     assert_eq!(response.body_string(), Some("Hello world".into()));
-
 }
