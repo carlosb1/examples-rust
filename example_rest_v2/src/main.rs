@@ -18,6 +18,8 @@ use rocket::http::Status;
 use rocket::Outcome::Failure;
 use serde::{Deserialize, Serialize};
 
+use rocket_contrib::json::Json;
+
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use dotenv::dotenv;
@@ -31,6 +33,7 @@ use schema::posts;
 
 use std::rc::Rc;
 
+#[derive(Serialize)]
 #[derive(Debug)]
 #[derive(Queryable)]
 pub struct Post {
@@ -63,7 +66,8 @@ impl FromDataSimple for NewPost {
     }
 }
 
-// DB classes 
+// DB classes
+#[derive(Clone)]
 pub struct DBPost {}
 
 impl DBPost {
@@ -81,6 +85,10 @@ impl DBPost {
         pub fn read(self) -> Vec<Post> {
             let conn = self.establish_connection();
             posts::table.load::<Post>(&conn).unwrap()
+      }
+      pub fn clear(self)  {
+            let conn = self.establish_connection();
+            diesel::delete(posts::table).execute(&conn);
       }
 }
 
@@ -165,13 +173,13 @@ impl<'a, 'r> FromRequest<'a, 'r> for HelloWorldCase {
 }
 
 #[get("/")]
-fn get(db: DBPost) -> &'static str {
-    HelloWorldCase{db: Rc::new(Some(db))}.run()
+fn get(db: DBPost) -> Json<&'static str> {
+    Json(HelloWorldCase{db: Rc::new(Some(db))}.run())
 }
 #[post("/", format="application/json", data="<post>")]
-fn post(db: DBPost, post: NewPost) -> &'static str {
+fn post(db: DBPost, post: NewPost) -> Json<&'static str> {
     println!("{:?}", post);
-    AddNewPostCase{db: Rc::new(Some(db)), post:post}.run()
+    Json(AddNewPostCase{db: Rc::new(Some(db)), post:post}.run())
 }
 
 
@@ -189,17 +197,17 @@ fn test1() {
     let rocket = rocket::ignite().manage(db).mount("/", routes![get, post]);
     let client = Client::new(rocket).unwrap();
     let mut response = client.get("/").dispatch();
-    assert_eq!(response.body_string(), Some("Hello world".into()));
+    assert_eq!(response.body_string(), Some("\"Hello world\"".into()));
 }
 
 
 #[test]
 fn test2() {
     use rocket::local::Client;
-//    let use_case = HelloWorldCase{};
     let db = DBPost{};
+    db.clone().clear();
     let rocket = rocket::ignite().manage(db).mount("/", routes![get, post]);
     let client = Client::new(rocket).unwrap();
     let mut response = client.post("/").header(ContentType::JSON).body("{\"title\": \"mytitle1\", \"body\": \"mybody1\"}").dispatch();
-    assert_eq!(response.body_string(), Some("Hello world".into()));
+    assert_eq!(response.body_string(), Some("\"Hello world\"".into()));
 }
