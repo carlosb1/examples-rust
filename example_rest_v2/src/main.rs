@@ -1,23 +1,34 @@
 #![feature(proc_macro_hygiene)]
 #![feature(decl_macro)]
+#![feature(rustc_private)]
 #[macro_use] extern crate rocket;
 #[macro_use] extern crate diesel;
+extern crate serde_json;
+extern crate serde;
 extern crate dotenv;
 
 
 use rocket::request::{Outcome, FromRequest};
-use rocket::Outcome::{Success};
+use rocket::Outcome::Success;
 use rocket::Request;
+
+use rocket::Data;
+use rocket::data::{self, FromDataSimple};
+use rocket::http::Status;
+use rocket::Outcome::Failure;
+use serde::{Deserialize, Serialize};
 
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
 
+
+
 pub mod schema;
 use schema::posts;
 
-
+use std::rc::Rc;
 
 #[derive(Debug)]
 #[derive(Queryable)]
@@ -28,12 +39,27 @@ pub struct Post {
     pub publihed: bool,
 }
 
+#[derive(Serialize, Deserialize)]
 #[derive(Insertable)]
+#[derive(Clone)]
+#[derive(Debug)]
 #[table_name="posts"]
-pub struct NewPost <'a>{
-    pub title: &'a str,
-    pub body: &'a str,
+pub struct NewPost{
+    pub title: String,
+    pub body: String,
+}
 
+impl FromDataSimple for NewPost {
+    type Error = String;
+    
+    #[allow(unused_variables)]
+    fn from_data(req: &Request, data: Data) -> data::Outcome<Self, String> {
+        let reader = data.open();
+        match serde_json::from_reader(reader).map(|val| val) {
+            Ok(value) => Success(value),
+            Err(e) => Failure((Status::BadRequest, e.to_string())),
+        }
+    }
 }
 
 // DB classes 
@@ -70,7 +96,6 @@ pub trait UseCase {
     fn run(&self) -> &'static str;
 }
 
-use std::rc::Rc;
 
 struct HelloWorldCase {
     db: Rc<Option<DBPost>>
@@ -80,7 +105,6 @@ impl HelloWorldCase {
     pub fn new() -> HelloWorldCase {
         HelloWorldCase{db: Rc::new(None)}
     }
-
 }
 
 impl UseCase for HelloWorldCase {
@@ -88,13 +112,40 @@ impl UseCase for HelloWorldCase {
         //unwrap shared reference
         let values = Rc::try_unwrap(Rc::clone(&self.db));
         let result = match values.unwrap_or(None)  {
-            Some(x) => x.read(),
+            Some(unwrapped_db) => unwrapped_db.read(),
             None => Vec::new(),
         };
         println!("{:?}",result);
         "Hello world"
     }
 }
+
+
+struct AddNewPostCase {
+    db: Rc<Option<DBPost>>,
+    post: NewPost
+}
+impl AddNewPostCase  {
+    pub fn new(post: NewPost) -> AddNewPostCase {
+        AddNewPostCase{db: Rc::new(None), post: post}
+    }
+}
+
+
+impl UseCase for AddNewPostCase {
+    fn run(&self) -> &'static str {
+        //unwrap shared reference
+        let unwrap_db = Rc::try_unwrap(Rc::clone(&self.db));
+        let created_post = match unwrap_db {
+            Ok(v) => Some(v.unwrap().create(self.post.clone())),
+            Err(e) => {println!("It was not possible ost the result"); None},
+        };
+        "Hello world"
+    }
+}
+
+
+
 
 impl<'a, 'r> FromRequest<'a, 'r> for HelloWorldCase {
     type Error = ();
@@ -107,12 +158,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for HelloWorldCase {
 fn get(db: DBPost) -> &'static str {
     HelloWorldCase{db: Rc::new(Some(db))}.run()
 }
-/*
 #[post("/", format="application/json", data="<post>")]
 fn post(db: DBPost, post: NewPost) -> &'static str {
     "post"
 }
-*/
 
 
 fn main() {
