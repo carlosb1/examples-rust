@@ -23,6 +23,7 @@ use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
 
+use rocket::http::ContentType;
 
 
 pub mod schema;
@@ -138,7 +139,7 @@ impl UseCase for AddNewPostCase {
         let unwrap_db = Rc::try_unwrap(Rc::clone(&self.db));
         let created_post = match unwrap_db {
             Ok(v) => Some(v.unwrap().create(self.post.clone())),
-            Err(e) => {println!("It was not possible ost the result"); None},
+            Err(_) => {println!("It was not possible ost the result"); None},
         };
         "Hello world"
     }
@@ -160,12 +161,14 @@ fn get(db: DBPost) -> &'static str {
 }
 #[post("/", format="application/json", data="<post>")]
 fn post(db: DBPost, post: NewPost) -> &'static str {
-    "post"
+    println!("{:?}", post);
+    AddNewPostCase{db: Rc::new(Some(db)), post:post}.run()
 }
 
 
 fn main() {
-    rocket::ignite().mount("/", routes![get]).launch();
+    let db = DBPost{};
+    rocket::ignite().manage(db).mount("/", routes![get, post]).launch();
 }
 
 
@@ -174,8 +177,20 @@ fn test1() {
     use rocket::local::Client;
 //    let use_case = HelloWorldCase{};
     let db = DBPost{};
-    let rocket = rocket::ignite().manage(db).mount("/", routes![get]);
+    let rocket = rocket::ignite().manage(db).mount("/", routes![get, post]);
     let client = Client::new(rocket).unwrap();
     let mut response = client.get("/").dispatch();
+    assert_eq!(response.body_string(), Some("Hello world".into()));
+}
+
+
+#[test]
+fn test2() {
+    use rocket::local::Client;
+//    let use_case = HelloWorldCase{};
+    let db = DBPost{};
+    let rocket = rocket::ignite().manage(db).mount("/", routes![get, post]);
+    let client = Client::new(rocket).unwrap();
+    let mut response = client.post("/").header(ContentType::JSON).body("{\"title\": \"mytitle1\", \"body\": \"mybody1\"}").dispatch();
     assert_eq!(response.body_string(), Some("Hello world".into()));
 }
