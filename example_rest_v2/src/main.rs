@@ -111,11 +111,15 @@ impl HelloWorldCase {
 impl UseCase for HelloWorldCase {
     fn run(&self) -> &'static str {
         //unwrap shared reference
+        /*
         let values = Rc::try_unwrap(Rc::clone(&self.db));
         let result = match values.unwrap_or(None)  {
             Some(unwrapped_db) => unwrapped_db.read(),
             None => Vec::new(),
         };
+        */
+        let db = DBPost{};
+        let result = db.read();
         println!("{:?}",result);
         "Hello world"
     }
@@ -136,11 +140,16 @@ impl AddNewPostCase  {
 impl UseCase for AddNewPostCase {
     fn run(&self) -> &'static str {
         //unwrap shared reference
+        /*
         let unwrap_db = Rc::try_unwrap(Rc::clone(&self.db));
         let created_post = match unwrap_db {
             Ok(v) => Some(v.unwrap().create(self.post.clone())),
             Err(_) => {println!("It was not possible ost the result"); None},
         };
+        */
+        //TODO find best way to do it... added generics?
+        let db = DBPost{};
+        let result = db.create(self.post.clone());
         "Hello world"
     }
 }
