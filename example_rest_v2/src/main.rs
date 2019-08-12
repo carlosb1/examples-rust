@@ -15,17 +15,18 @@ use rocket::Request;
 use rocket::Data;
 use rocket::data::{self, FromDataSimple};
 use rocket::http::Status;
+use rocket::http::ContentType;
 use rocket::Outcome::Failure;
 use serde::{Deserialize, Serialize};
 
 use rocket_contrib::json::Json;
+
 
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
 
-use rocket::http::ContentType;
 
 
 pub mod schema;
@@ -67,7 +68,7 @@ impl FromDataSimple for NewPost {
 }
 
 // DB classes
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct DBPost {}
 
 impl DBPost {
@@ -100,35 +101,33 @@ impl<'a, 'r> FromRequest<'a, 'r> for DBPost {
 }
 
 
-struct HelloWorldCase {
-    db: Rc<Option<DBPost>>
+struct GetPostsCase {
+    db: Rc<DBPost>
 }
 
-impl HelloWorldCase {
-    pub fn new() -> HelloWorldCase {
-        HelloWorldCase{db: Rc::new(None)}
+impl GetPostsCase {
+    pub fn new(db: DBPost) ->GetPostsCase {
+        GetPostsCase{db: Rc::new(db)}
     }
     pub fn run(&self) -> Vec<Post> {
         //unwrap shared reference
-        let db = DBPost{};
-        let result = db.read();
+        let result = self.db.read();
         result   
     }
 }
 
 
 struct AddNewPostCase {
-    db: Rc<Option<DBPost>>,
+    db: Rc<DBPost>,
     post: NewPost
 }
 impl AddNewPostCase  {
-    pub fn new(post: NewPost) -> AddNewPostCase {
-        AddNewPostCase{db: Rc::new(None), post: post}
+    pub fn new(post: NewPost, db: DBPost) -> AddNewPostCase {
+        AddNewPostCase{db: Rc::new(db), post: post}
     }
     pub fn run(&self) -> Post {
         //TODO find best way to do it... added generics?
-        let db = DBPost{};
-        let result = db.create(self.post.clone());
+        let result = self.db.create(self.post.clone());
         result
     }
 }
@@ -136,20 +135,21 @@ impl AddNewPostCase  {
 
 
 
-impl<'a, 'r> FromRequest<'a, 'r> for HelloWorldCase {
+impl<'a, 'r> FromRequest<'a, 'r> for GetPostsCase {
     type Error = ();
     fn from_request(_request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        Success(HelloWorldCase::new())
+        Success(GetPostsCase::new(DBPost{}))
     }
 }
 
+
 #[get("/")]
 fn get(db: DBPost) -> Json<Vec<Post>> {
-    Json(HelloWorldCase{db: Rc::new(Some(db))}.run())
+    Json(GetPostsCase{db: Rc::new(db)}.run())
 }
 #[post("/", format="application/json", data="<post>")]
 fn post(db: DBPost, post: NewPost) -> Json<Post> {
-    Json(AddNewPostCase{db: Rc::new(Some(db)), post:post}.run())
+    Json(AddNewPostCase{db: Rc::new(db), post:post}.run())
 }
 
 
