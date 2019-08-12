@@ -100,12 +100,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for DBPost {
 }
 
 
-// Entities classes
-pub trait UseCase {
-    fn run(&self) -> &'static str;
-}
-
-
 struct HelloWorldCase {
     db: Rc<Option<DBPost>>
 }
@@ -114,22 +108,11 @@ impl HelloWorldCase {
     pub fn new() -> HelloWorldCase {
         HelloWorldCase{db: Rc::new(None)}
     }
-}
-
-impl UseCase for HelloWorldCase {
-    fn run(&self) -> &'static str {
+    pub fn run(&self) -> Vec<Post> {
         //unwrap shared reference
-        /*
-        let values = Rc::try_unwrap(Rc::clone(&self.db));
-        let result = match values.unwrap_or(None)  {
-            Some(unwrapped_db) => unwrapped_db.read(),
-            None => Vec::new(),
-        };
-        */
         let db = DBPost{};
         let result = db.read();
-        println!("{:?}",result);
-        "Hello world"
+        result   
     }
 }
 
@@ -142,23 +125,11 @@ impl AddNewPostCase  {
     pub fn new(post: NewPost) -> AddNewPostCase {
         AddNewPostCase{db: Rc::new(None), post: post}
     }
-}
-
-
-impl UseCase for AddNewPostCase {
-    fn run(&self) -> &'static str {
-        //unwrap shared reference
-        /*
-        let unwrap_db = Rc::try_unwrap(Rc::clone(&self.db));
-        let created_post = match unwrap_db {
-            Ok(v) => Some(v.unwrap().create(self.post.clone())),
-            Err(_) => {println!("It was not possible ost the result"); None},
-        };
-        */
+    pub fn run(&self) -> Post {
         //TODO find best way to do it... added generics?
         let db = DBPost{};
         let result = db.create(self.post.clone());
-        "Hello world"
+        result
     }
 }
 
@@ -173,12 +144,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for HelloWorldCase {
 }
 
 #[get("/")]
-fn get(db: DBPost) -> Json<&'static str> {
+fn get(db: DBPost) -> Json<Vec<Post>> {
     Json(HelloWorldCase{db: Rc::new(Some(db))}.run())
 }
 #[post("/", format="application/json", data="<post>")]
-fn post(db: DBPost, post: NewPost) -> Json<&'static str> {
-    println!("{:?}", post);
+fn post(db: DBPost, post: NewPost) -> Json<Post> {
     Json(AddNewPostCase{db: Rc::new(Some(db)), post:post}.run())
 }
 
@@ -192,12 +162,11 @@ fn main() {
 #[test]
 fn test1() {
     use rocket::local::Client;
-//    let use_case = HelloWorldCase{};
     let db = DBPost{};
     let rocket = rocket::ignite().manage(db).mount("/", routes![get, post]);
     let client = Client::new(rocket).unwrap();
     let mut response = client.get("/").dispatch();
-    assert_eq!(response.body_string(), Some("\"Hello world\"".into()));
+    assert_eq!(response.body_string().is_some(),true);
 }
 
 
@@ -209,5 +178,5 @@ fn test2() {
     let rocket = rocket::ignite().manage(db).mount("/", routes![get, post]);
     let client = Client::new(rocket).unwrap();
     let mut response = client.post("/").header(ContentType::JSON).body("{\"title\": \"mytitle1\", \"body\": \"mybody1\"}").dispatch();
-    assert_eq!(response.body_string(), Some("\"Hello world\"".into()));
+    assert_eq!(response.body_string().is_some(), true);
 }
