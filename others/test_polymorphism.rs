@@ -1,10 +1,11 @@
 use std::rc::Rc;
 
-
+#[derive(Copy, Clone)]
 struct Pig {
     name: &'static str
 }
 
+#[derive(Copy, Clone)]
 struct Dog {
     name: &'static str
 }
@@ -29,6 +30,7 @@ impl Animal for Dog {
 struct Farm {
     animal: Rc<dyn Animal>
 }
+
 
 struct Family {
    animal: Rc<dyn Animal> 
