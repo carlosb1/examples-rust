@@ -28,7 +28,12 @@ impl Animal for Dog {
 
 
 struct Farm {
-    animal: Rc<dyn Animal>
+    animal: Rc<dyn Animal>,
+}
+impl Farm {
+    fn hello_farm(&self) {
+        self.animal.sound();
+    }
 }
 
 
@@ -42,8 +47,14 @@ fn main () {
     pig.sound();
     let dog = Dog{name: "dog1"};
     dog.sound();
-    let farm = Farm{animal: Rc::new(pig)};
-    let farm2 = Farm{animal: Rc::new(pig)};
+    let ref_pig = Rc::new(pig);
+    let farm = Farm{animal: ref_pig.clone()};
+    let farm2 = Farm{animal: ref_pig.clone()};
+    let farm3 = Farm{animal: Rc::new(dog)};
+
+    farm.hello_farm();
+    farm2.hello_farm();
+    farm3.hello_farm();
 
 
     // hello example
