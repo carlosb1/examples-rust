@@ -1,0 +1,13 @@
+[package]
+name = "example_tokio_v2"
+version = "0.1.0"
+authors = ["Carlos B <carlos.baez@optimasports.es>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = "0.1.7"
+tokio-io = "0.1.7"
+futures = "0.1.23"
+bytes = "0.4"
