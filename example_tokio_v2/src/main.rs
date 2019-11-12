@@ -15,15 +15,6 @@ use std::io;
 use tokio::codec::{Encoder,Decoder};
 use tokio::prelude::*;
 use tokio::net::TcpListener;
-use std::sync::{Arc, Mutex};
-
-
-
-/* generic interface for protocols */
-pub trait MessageProtocolParser {
-    fn parse(&self, info: &Vec<u8>);
-    fn is_message(&self, info: &Vec<u8>) -> bool;
-}
 
 
 #[derive(Clone,Copy)]
@@ -34,11 +25,8 @@ impl ExampleJSONParser {
     }
 }
 
-impl MessageProtocolParser for ExampleJSONParser {
-    fn is_message(&self, info: &Vec<u8>) -> bool {
-        true
-    }
-    fn parse(&self, info: &Vec<u8>) {
+impl ExampleJSONParser {
+    fn parse(&self, info: &Vec<u8>)  -> Message {
         let vec_to_parse = info.clone();
         let message = String::from_utf8(vec_to_parse).unwrap();
         println!("Json parser for: {:?}", message);
@@ -46,6 +34,7 @@ impl MessageProtocolParser for ExampleJSONParser {
             Err(..) =>   {println!("It was not parsed correctly"); Message::new_empty() },
             Ok(msg) => msg,
         };
+        return msg
     }
 }
 
@@ -75,54 +64,45 @@ impl MyBytesCodec {
 }
 
 impl Decoder for MyBytesCodec {
-    type Item = Vec<u8>;
+    type Item = Message;
     type Error = io::Error;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<Vec<u8>>> {
+    fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<Message>> {
         if buf.len() == 0 {
             return Ok(None);
         }
         let data = buf.clone().to_vec();
-        /*
-         * add my logic
-        for parser in self.parsers.iter() {
-            let cloned_data = data.clone();
-            if parser.lock().unwrap().is_message(&cloned_data) {
-                parser.lock().unwrap().parse(&cloned_data);
-            }
-        }
-        */
+        let cloned_data = data.clone();
+        let parsed = self.json_parser.parse(&cloned_data); 
         buf.clear();
-        Ok(Some(data))
+        Ok(Some(parsed))
     }
 }
 
 impl Encoder for MyBytesCodec {
-    type Item = Vec<u8>;
+    type Item = Message;
     type Error = io::Error;
 
-    fn encode(&mut self, data: Vec<u8>, buf: &mut BytesMut) -> io::Result<()> {
-        buf.extend(data);
+    fn encode(&mut self, data: Message, buf: &mut BytesMut) -> io::Result<()> {
+        buf.extend(serde_json::to_string(&data)?.into_bytes());
         Ok(())
     }
 }
-    
+
+
 
 fn main() {
     let addr = "127.0.0.1:12345".parse().unwrap();
     let listener = TcpListener::bind(&addr).expect("unable to bind TCP listener");
-    
-    let json_parser = ExampleJSONParser::new();
-    
-
     let server = listener.incoming()
             .map_err(|e| eprintln!("accept failed = {:?}", e))
             .for_each(move |socket| {
                 let framed = MyBytesCodec::new().framed(socket);
                 let (_writer, reader) = framed.split();
 
-                let handle_conn = reader.for_each(|bytes| {
-                    println!("no modified bytes: {:?}", bytes); 
+                /* function to handle connection  */
+                let handle_conn = reader.for_each(|message| {
+                    println!("my parsed message!!: {:?}", serde_json::to_string(&message)); 
                     Ok(())
                 })
                 .and_then(|()| {
@@ -143,3 +123,4 @@ fn main() {
     });
     tokio::run(server);
 }
+
