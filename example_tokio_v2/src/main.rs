@@ -15,6 +15,8 @@ use std::io;
 use tokio::codec::{Encoder,Decoder};
 use tokio::prelude::*;
 use tokio::net::TcpListener;
+use std::collections::HashMap;
+use std::sync::{Mutex, Arc};
 
 
 #[derive(Clone,Copy)]
@@ -52,14 +54,17 @@ impl Message {
     }
     
 }
+pub trait Operation {
+}
 
 pub struct MyBytesCodec {
     json_parser: ExampleJSONParser,
+    operations: HashMap<String, Box<dyn Operation + Send>>,
 }
 
 impl MyBytesCodec {
     fn new() -> MyBytesCodec {
-        MyBytesCodec{json_parser: ExampleJSONParser::new()}
+        MyBytesCodec{json_parser: ExampleJSONParser::new(), operations: HashMap::new()}
     }
 }
 
@@ -88,6 +93,8 @@ impl Encoder for MyBytesCodec {
         Ok(())
     }
 }
+
+
 
 
 
