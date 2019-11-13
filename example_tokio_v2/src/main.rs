@@ -59,7 +59,8 @@ pub trait Operation {
 
 pub struct MyBytesCodec {
     json_parser: ExampleJSONParser,
-    operations: HashMap<String, Box<dyn Operation + Send>>,
+    operations: HashMap<String, Arc<Mutex<dyn Operation + Send + 'static>>>,
+    //operations: HashMap<String, Box<dyn Operation + Send>>,
 }
 
 impl MyBytesCodec {
