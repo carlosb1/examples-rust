@@ -55,12 +55,19 @@ impl Message {
     
 }
 pub trait Operation {
+    fn run(self);
+}
+
+impl Operation for Message {
+    fn run (self) {
+        println!("hello!");
+    }
 }
 
 pub struct MyBytesCodec {
     json_parser: ExampleJSONParser,
-    operations: HashMap<String, Arc<Mutex<dyn Operation + Send + 'static>>>,
-    //operations: HashMap<String, Box<dyn Operation + Send>>,
+    //operations: HashMap<String, Arc<Mutex<dyn Operation + Send + 'static>>>,
+    operations: HashMap<String, Box<dyn Operation + Send>>,
 }
 
 impl MyBytesCodec {
