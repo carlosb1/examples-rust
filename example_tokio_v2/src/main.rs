@@ -17,6 +17,7 @@ use tokio::prelude::*;
 use tokio::net::TcpListener;
 use std::collections::HashMap;
 use std::sync::{Mutex, Arc};
+use std::rc::Rc;
 
 
 #[derive(Clone,Copy)]
@@ -40,12 +41,13 @@ impl ExampleJSONParser {
     }
 }
 
+#[derive(Clone)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Message {
     operation: String,
 }
 
-impl Message {
+impl Message{
     fn new(operation: String) -> Message {
         Message {operation: operation} 
     }
@@ -54,6 +56,7 @@ impl Message {
     }
     
 }
+
 pub trait Operation {
     fn run(self);
 }
@@ -66,13 +69,11 @@ impl Operation for Message {
 
 pub struct MyBytesCodec {
     json_parser: ExampleJSONParser,
-    //operations: HashMap<String, Arc<Mutex<dyn Operation + Send + 'static>>>,
-    operations: HashMap<String, Box<dyn Operation + Send>>,
 }
 
 impl MyBytesCodec {
     fn new() -> MyBytesCodec {
-        MyBytesCodec{json_parser: ExampleJSONParser::new(), operations: HashMap::new()}
+        MyBytesCodec{json_parser: ExampleJSONParser::new()}
     }
 }
 
@@ -104,9 +105,10 @@ impl Encoder for MyBytesCodec {
 
 
 
-
-
 fn main() {
+    let operations: HashMap<String, Message> = HashMap::new();
+    let shared_oper = Arc::new(Mutex::new(operations));
+
     let addr = "127.0.0.1:12345".parse().unwrap();
     let listener = TcpListener::bind(&addr).expect("unable to bind TCP listener");
     let server = listener.incoming()
@@ -114,10 +116,16 @@ fn main() {
             .for_each(move |socket| {
                 let framed = MyBytesCodec::new().framed(socket);
                 let (_writer, reader) = framed.split();
-
+                let operations = shared_oper.clone();
                 /* function to handle connection  */
-                let handle_conn = reader.for_each(|message| {
-                    println!("my parsed message!!: {:?}", serde_json::to_string(&message)); 
+                let handle_conn = reader.for_each(move |message| {
+                    println!("my parsed message!!: {:?}", serde_json::to_string(&message));
+                    
+                    if (operations.lock().unwrap().contains_key(&message.operation)) {
+                        let extracted_operations = operations.lock().unwrap();
+                        extracted_operations.get(&message.operation).unwrap().clone().run();
+                    }
+
                     Ok(())
                 })
                 .and_then(|()| {
