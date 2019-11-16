@@ -15,8 +15,8 @@ use std::io;
 use tokio::codec::{Encoder,Decoder};
 use tokio::prelude::*;
 use tokio::net::TcpListener;
-use std::collections::HashMap;
 use std::sync::{Mutex, Arc};
+use std::collections::LinkedList;
 use std::rc::Rc;
 
 
@@ -57,6 +57,7 @@ impl Message{
     
 }
 
+// traits for operations 
 pub trait Operation {
     fn run(self);
 }
@@ -106,8 +107,9 @@ impl Encoder for MyBytesCodec {
 
 
 fn main() {
-    let operations: HashMap<String, Message> = HashMap::new();
-    let shared_oper = Arc::new(Mutex::new(operations));
+    let mut list = LinkedList::new();
+    list.push_back(Message::new("register".to_string()));
+    let shared_list = Arc::new(Mutex::new(list));
 
     let addr = "127.0.0.1:12345".parse().unwrap();
     let listener = TcpListener::bind(&addr).expect("unable to bind TCP listener");
@@ -115,17 +117,17 @@ fn main() {
             .map_err(|e| eprintln!("accept failed = {:?}", e))
             .for_each(move |socket| {
                 let framed = MyBytesCodec::new().framed(socket);
-                let (_writer, reader) = framed.split();
-                let operations = shared_oper.clone();
+                let (writer, reader) = framed.split();
+                let list = shared_list.clone();
                 /* function to handle connection  */
                 let handle_conn = reader.for_each(move |message| {
-                    println!("my parsed message!!: {:?}", serde_json::to_string(&message));
-                    
-                    if (operations.lock().unwrap().contains_key(&message.operation)) {
-                        let extracted_operations = operations.lock().unwrap();
-                        extracted_operations.get(&message.operation).unwrap().clone().run();
+                    //writer.send(Message::new("".to_string()));
+                    println!("my parsed message!!: {:?}", serde_json::to_string(&message)); 
+                    for elem in list.lock().unwrap().iter() {
+                        if elem.operation == message.operation  {
+                            elem.clone().run();
+                        }
                     }
-
                     Ok(())
                 })
                 .and_then(|()| {
