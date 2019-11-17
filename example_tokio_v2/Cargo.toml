@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 tokio = "0.1.12"
+tokio-proto = "0.1.1"
 tokio-io = "0.1.12"
 tokio-codec = "0.1.1"
 bytes = "0.4.12"

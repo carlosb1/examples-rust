@@ -3,6 +3,7 @@ extern crate serde_derive;
 
 extern crate bytes;
 extern crate tokio;
+extern crate tokio_proto as proto;
 extern crate tokio_codec;
 extern crate tokio_io;
 
@@ -14,10 +15,12 @@ use bytes::BytesMut;
 use std::io;
 use tokio::codec::{Encoder,Decoder};
 use tokio::prelude::*;
-use tokio::net::TcpListener;
 use std::sync::{Mutex, Arc};
 use std::collections::LinkedList;
-use std::rc::Rc;
+use tokio::net::{TcpStream, TcpListener};
+// use std::rc::Rc;
+// use proto::TcpServer;
+// use proto::pipeline::{ClientProto, ServerProto};
 
 
 #[derive(Clone,Copy)]
@@ -103,6 +106,32 @@ impl Encoder for MyBytesCodec {
         Ok(())
     }
 }
+fn respond(req: Message, shared_list: Arc<Mutex<LinkedList<Message>>>) -> Box<Future<Item=Message, Error= io::Error>  + Send>{
+    for elem in shared_list.lock().unwrap().iter() {
+        if elem.operation == req.operation {
+            elem.clone().run();
+        }
+    }
+    Box::new(future::ok(Message::new("".to_string())))
+}
+
+fn process (socket: TcpStream, shared_list: Arc<Mutex<LinkedList<Message>>>) {
+    let framed = MyBytesCodec::new().framed(socket);
+    let (writer, reader) = framed.split();
+    let task = writer.send_all(reader.and_then(move | message | {
+            let shared_list = shared_list.clone();    
+            respond(message, shared_list)
+        }))
+        .then(|res| {
+            if let Err(e) = res {
+                println!("Failed to process connection; error = {:?}", e);
+            }
+            Ok(())
+        });
+
+    tokio::spawn(task);
+}
+
 
 
 
@@ -116,35 +145,9 @@ fn main() {
     let server = listener.incoming()
             .map_err(|e| eprintln!("accept failed = {:?}", e))
             .for_each(move |socket| {
-                let framed = MyBytesCodec::new().framed(socket);
-                let (writer, reader) = framed.split();
-                let list = shared_list.clone();
-                /* function to handle connection  */
-                let handle_conn = reader.for_each(move |message| {
-                    //writer.send(Message::new("".to_string()));
-                    println!("my parsed message!!: {:?}", serde_json::to_string(&message)); 
-                    for elem in list.lock().unwrap().iter() {
-                        if elem.operation == message.operation  {
-                            elem.clone().run();
-                        }
-                    }
-                    Ok(())
-                })
-                .and_then(|()| {
-                    println!("Socket received FIN packet and closed connection");
-                    Ok(())
-                })
-                .or_else(|err| {
-                    println!("Socked closed with error: {:?}", err);
-                    Err(err)
-
-                })
-                .then(|result| {
-                    println!("Socket closed with result: {:?}", result);
-                    Ok(())
-                });
-               
-            tokio::spawn(handle_conn)
+                let shared_list = shared_list.clone();
+                process(socket, shared_list);
+                Ok(())
     });
     tokio::run(server);
 }
