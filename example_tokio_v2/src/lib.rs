@@ -14,13 +14,7 @@ extern crate serde_json;
 use bytes::BytesMut;
 use std::io;
 use tokio::codec::{Encoder,Decoder};
-use tokio::prelude::*;
-use std::sync::{Mutex, Arc};
-use std::collections::LinkedList;
-use tokio::net::{TcpStream, TcpListener};
-// use std::rc::Rc;
-// use proto::TcpServer;
-// use proto::pipeline::{ClientProto, ServerProto};
+
 
 
 #[derive(Clone,Copy)]
@@ -47,14 +41,14 @@ impl ExampleJSONParser {
 #[derive(Clone)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Message {
-    operation: String,
+    pub operation: String,
 }
 
 impl Message{
-    fn new(operation: String) -> Message {
+    pub fn new(operation: String) -> Message {
         Message {operation: operation} 
     }
-    fn new_empty() -> Message  {
+    pub fn new_empty() -> Message  {
         Message {operation: "".to_string()}
     }
     
@@ -70,13 +64,12 @@ impl Operation for Message {
         println!("hello!");
     }
 }
-
 pub struct MyBytesCodec {
     json_parser: ExampleJSONParser,
 }
 
 impl MyBytesCodec {
-    fn new() -> MyBytesCodec {
+    pub fn new() -> MyBytesCodec {
         MyBytesCodec{json_parser: ExampleJSONParser::new()}
     }
 }
@@ -105,50 +98,5 @@ impl Encoder for MyBytesCodec {
         buf.extend(serde_json::to_string(&data)?.into_bytes());
         Ok(())
     }
-}
-fn respond(req: Message, shared_list: Arc<Mutex<LinkedList<Message>>>) -> Box<Future<Item=Message, Error= io::Error>  + Send>{
-    for elem in shared_list.lock().unwrap().iter() {
-        if elem.operation == req.operation {
-            elem.clone().run();
-        }
-    }
-    Box::new(future::ok(Message::new("".to_string())))
-}
-
-fn process (socket: TcpStream, shared_list: Arc<Mutex<LinkedList<Message>>>) {
-    let framed = MyBytesCodec::new().framed(socket);
-    let (writer, reader) = framed.split();
-    let task = writer.send_all(reader.and_then(move | message | {
-            let shared_list = shared_list.clone();    
-            respond(message, shared_list)
-        }))
-        .then(|res| {
-            if let Err(e) = res {
-                println!("Failed to process connection; error = {:?}", e);
-            }
-            Ok(())
-        });
-
-    tokio::spawn(task);
-}
-
-
-
-
-fn main() {
-    let mut list = LinkedList::new();
-    list.push_back(Message::new("register".to_string()));
-    let shared_list = Arc::new(Mutex::new(list));
-
-    let addr = "127.0.0.1:12345".parse().unwrap();
-    let listener = TcpListener::bind(&addr).expect("unable to bind TCP listener");
-    let server = listener.incoming()
-            .map_err(|e| eprintln!("accept failed = {:?}", e))
-            .for_each(move |socket| {
-                let shared_list = shared_list.clone();
-                process(socket, shared_list);
-                Ok(())
-    });
-    tokio::run(server);
 }
 
