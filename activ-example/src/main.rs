@@ -3,9 +3,16 @@ use actix::{Actor, Addr, Context, System};
 struct MyActor;
 
 impl Actor for MyActor {
-    fn started(&mut self, ctx: )
+    type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        println!("I am alive");
+        System::current().stop();
+    }
 }
 
 fn main() {
-    println!("Hello, world!");
+    let system = System::new("test");
+    let addr = MyActor.start();
+    system.run();
 }
