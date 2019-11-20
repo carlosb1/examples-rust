@@ -4,7 +4,16 @@ use std::thread;
 
 static NTHREADS: i32 = 3;
 
+pub struct Hello;
+impl Hello {
+    pub fn hello_world (self) {
+        println!("hello world");
+    }
+}
 fn main () {
+    let hello = Hello{};
+    thread::spawn(hello.hello_world());
+
     let (tx, rx): (Sender<i32>, Receiver<i32>) = mpsc::channel();
     let mut children = Vec::new();
     for id in 0..NTHREADS {
