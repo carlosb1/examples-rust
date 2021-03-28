@@ -7,6 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+futures = "0.3.6"
+getopts = "0.2.21"
+rand = "0.7.3"
+trust-dns-resolver = "0.19.5"
 tokio = { version = "1", features = ["full"] }
 warp = '0.3'
 warp-reverse-proxy='0.3'
@@ -18,3 +22,7 @@ path='src/main.rs'
 [[bin]]
 name='http-proxy'
 path='src/http-proxy.rs'
+
+[[bin]]
+name='tcp-proxy'
+path='src/tcp-proxy.rs'
