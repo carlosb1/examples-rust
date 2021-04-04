@@ -1,5 +1,5 @@
 [package]
-	name = "example-ffmpeg"
+name = "example-ffmpeg"
 version = "0.1.0"
 authors = ["carlosb1 <mcflurry0@gmail.com>"]
 edition = "2018"
