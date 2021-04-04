@@ -124,13 +124,17 @@ pub fn main() {
 
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
-    opts.optopt("o", "", "set remote host for the forwarding", "REMOTE_HOST");
-    opts.optopt("i", "", "set local port  for the forwarding", "LOCAL_HOST");
     opts.optopt(
-        "p",
+        "o",
         "",
-        "set remote port  for the forwarding",
-        "REMOTE PORT",
+        "set remote host with port for the forwarding type: REMOTE_HOST:NUMBER_PORT",
+        "REMOTE_HOST_WITH_PORT",
+    );
+    opts.optopt(
+        "i",
+        "",
+        "set local host with  port for the forwarding type: LOCAL_HOST:NUMBER_PORT",
+        "LOCAL_HOST_WITH_PORT",
     );
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -142,4 +146,31 @@ pub fn main() {
         print_usage(&program, opts);
         return;
     }
+    if !matches.opt_present("i") || !matches.opt_present("o") {
+        print_usage(&program, opts);
+        return;
+    }
+    let str_output = matches.opt_str("o").expect("Error getting output");
+    let output: Vec<&str> = str_output.split(":").collect();
+    let str_input = matches.opt_str("i").expect("Error getting input");
+    let input: Vec<&str> = str_input.split(":").collect();
+
+    if input.len() != 2 && output.len() != 2 {
+        print_usage(&program, opts);
+        return;
+    }
+    if input[1].parse::<i32>().is_err() || output[1].parse::<i32>().is_err() {
+        print_usage(&program, opts);
+        return;
+    }
+    let input_port = input[1].parse::<i32>().unwrap();
+    let output_port = output[1].parse::<i32>().unwrap();
+    let input_host = input[0];
+    let output_host = output[0];
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        forward(input_host, input_port, output_host, output_port)
+            .await
+            .expect("Thread could not be executed");
+    });
 }

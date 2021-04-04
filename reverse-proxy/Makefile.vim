@@ -4,4 +4,4 @@ build:
 	cargo build
 
 test: build
-	cargo run
+	cargo run --bin tcp-proxy
