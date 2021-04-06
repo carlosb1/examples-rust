@@ -1,8 +1,10 @@
+use futures::future::join_all;
 use getopts::Options;
 use std::env;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::join;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::runtime::Runtime;
 
 type BoxedError = Box<dyn std::error::Error + Sync + Send + 'static>;
 static DEBUG: AtomicBool = AtomicBool::new(false);
@@ -14,14 +16,17 @@ async fn forward(
     remote_port: i32,
 ) -> Result<(), BoxedError> {
     // Listen on the specified IP and port
+    println!("Calling forward port");
     let bind_addr = if bind_ip.contains(':') {
         format!("[{}]:{}", bind_ip, local_port)
     } else {
         format!("{}:{}", bind_ip, local_port)
     };
+    println!("Binding address {}", bind_addr);
     let bind_sock = bind_addr
         .parse::<std::net::SocketAddr>()
         .expect("Failed to parse bind address");
+    println!("Trying to binding...");
     let listener = TcpListener::bind(&bind_sock).await?;
     println!("Listening on {}", listener.local_addr().unwrap());
 
@@ -118,7 +123,7 @@ fn print_usage(program: &str, opts: Options) {
     print!("{}", opts.usage(&brief));
 }
 
-pub fn main() {
+fn main() {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
 
@@ -167,10 +172,9 @@ pub fn main() {
     let output_port = output[1].parse::<i32>().unwrap();
     let input_host = input[0];
     let output_host = output[0];
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        forward(input_host, input_port, output_host, output_port)
-            .await
-            .expect("Thread could not be executed");
-    });
+    //let mut futures: Vec<dyn Future<Output = Result<(), BoxedError>>> = Vec::new();
+    //futures.push(forward(input_host, input_port, output_host, output_port));
+    let futures = vec![forward(input_host, input_port, output_host, output_port)];
+    let rt = Runtime::new().unwrap();
+    rt.block_on(async { join_all(futures).await });
 }
