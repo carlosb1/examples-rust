@@ -26,3 +26,8 @@ path='src/http-proxy.rs'
 [[bin]]
 name='tcp-proxy'
 path='src/tcp-proxy.rs'
+
+
+[[bin]]
+name='tcp-proxy-2'
+path='src/tcp-proxy-2.rs'
