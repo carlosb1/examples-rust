@@ -1,10 +1,14 @@
 extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
+extern crate yaml_rust;
+
+use std::fs;
 use tokio::join;
 use tokio::net::TcpListener;
 use tokio::net::TcpSocket;
 use tokio::net::TcpStream;
+use yaml_rust::YamlLoader;
 
 use std::io;
 
@@ -42,6 +46,11 @@ async fn forward(
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
+    let config_file: &str = "config,yml";
+    let contents = fs::read_to_string(config_file).unwrap();
+    let docs = YamlLoader::load_from_str(contents.as_str()).unwrap();
+    let doc = &docs[0];
+
     pretty_env_logger::init();
     let output_port: &str = "8000";
     let output_address: &str = "0.0.0.0";
