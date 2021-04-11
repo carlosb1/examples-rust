@@ -1,27 +1,26 @@
+extern crate config;
 extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
-extern crate yaml_rust;
 
-use std::fs;
 use tokio::join;
 use tokio::net::TcpListener;
 use tokio::net::TcpSocket;
 use tokio::net::TcpStream;
-use yaml_rust::YamlLoader;
+use tokio::task;
+
+use std::collections::HashMap;
 
 use std::io;
 
-async fn forward(
-    mut stream_origin: TcpStream,
-    output_address: &str,
-    output_port: &str,
-) -> io::Result<()> {
-    let address = format!("{}:{}", output_address, output_port)
-        .parse()
-        .unwrap();
+type HashAddressInfo = HashMap<String, HashMap<String, String>>;
+type HashContainsYaml = HashMap<String, HashAddressInfo>;
+
+async fn forward(mut stream_origin: TcpStream, output_address: &str) -> io::Result<()> {
     let socket_output = TcpSocket::new_v4()?;
-    let mut stream_output = socket_output.connect(address).await?;
+    let mut stream_output = socket_output
+        .connect(output_address.parse().expect("Unable parse socket address"))
+        .await?;
     let (mut stream_origin_recv, mut stream_origin_send) = stream_origin.split();
     let (mut stream_output_recv, mut stream_output_send) = stream_output.split();
     let (stream_origin_bytes_copied, stream_output_bytes_copied) = join!(
@@ -44,20 +43,84 @@ async fn forward(
     Ok(())
 }
 
+pub struct Host {
+    host: String,
+    port: i32,
+}
+
+pub struct RuleConfig {
+    name: String,
+    input: Host,
+    output: Host,
+}
+
+fn load_config(config_file: &str) -> Vec<RuleConfig> {
+    let mut settings = config::Config::default();
+    settings
+        .merge(config::File::with_name(config_file))
+        .unwrap();
+    let mut doc = settings.try_into::<HashContainsYaml>().unwrap();
+
+    let mut rules: Vec<RuleConfig> = Vec::new();
+    for (name, value) in doc.iter_mut() {
+        let address_input = value.clone().get_mut("input").map_or(
+            Host {
+                host: "".to_owned(),
+                port: 0,
+            },
+            |v| Host {
+                host: v["host"].clone(),
+                port: v["port"].clone().parse::<i32>().unwrap(),
+            },
+        );
+        let address_output = value.clone().get_mut("output").map_or(
+            Host {
+                host: "".to_owned(),
+                port: 0,
+            },
+            |v| Host {
+                host: v["host"].clone(),
+                port: v["port"].clone().parse::<i32>().unwrap(),
+            },
+        );
+
+        rules.push(RuleConfig {
+            name: name.to_string(),
+            input: address_input,
+            output: address_output,
+        });
+    }
+
+    return rules;
+}
+
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    let config_file: &str = "config,yml";
-    let contents = fs::read_to_string(config_file).unwrap();
-    let docs = YamlLoader::load_from_str(contents.as_str()).unwrap();
-    let doc = &docs[0];
+    let config_file: &str = "/home/carlosb/rust-workspace/examples-rust/reverse-proxy/config.yml";
+    let rule_configs = load_config(config_file);
 
     pretty_env_logger::init();
-    let output_port: &str = "8000";
-    let output_address: &str = "0.0.0.0";
-    let listener = TcpListener::bind("127.0.0.1:8080").await?;
 
-    loop {
-        let (socket, _) = listener.accept().await?;
-        forward(socket, output_address, output_port).await?;
+    for rule in rule_configs {
+        let input_host = rule.input.host;
+        let input_port = rule.input.port;
+        let output_host = rule.output.host;
+        let output_port = rule.output.port;
+
+        let join = task::spawn(async {});
+
+        /*
+        let join = task::spawn(async {
+            let output_address = format!("{}:{}", output_host, output_host);
+            let input_address = format!("{}:{}", input_host, input_host);
+            let listener = TcpListener::bind(output_address).await?;
+            loop {
+                let (socket, _) = listener.accept().await?;
+                forward(socket, input_address.as_str()).await?;
+            }
+        });
+        join.await;
+        */
     }
+    Ok(())
 }
