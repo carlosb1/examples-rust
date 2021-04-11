@@ -3,6 +3,8 @@ extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
+use futures::future::join_all;
+
 use tokio::join;
 use tokio::net::TcpListener;
 use tokio::net::TcpSocket;
@@ -101,26 +103,27 @@ async fn main() -> io::Result<()> {
 
     pretty_env_logger::init();
 
+    let mut joins = Vec::new();
     for rule in rule_configs {
         let input_host = rule.input.host;
         let input_port = rule.input.port;
         let output_host = rule.output.host;
         let output_port = rule.output.port;
 
-        let join = task::spawn(async {});
-
-        /*
-        let join = task::spawn(async {
-            let output_address = format!("{}:{}", output_host, output_host);
-            let input_address = format!("{}:{}", input_host, input_host);
-            let listener = TcpListener::bind(output_address).await?;
+        let join = task::spawn(async move {
+            let output_address = format!("{}:{}", output_host, output_port);
+            let input_address = format!("{}:{}", input_host, input_port);
+            let listener = TcpListener::bind(output_address.clone())
+                .await
+                .expect(format!("Error binding address {}", output_address).as_str());
+            //TODO loop to wait for connection, is it needed this loop?
             loop {
-                let (socket, _) = listener.accept().await?;
-                forward(socket, input_address.as_str()).await?;
+                let (socket, _) = listener.accept().await.unwrap();
+                forward(socket, input_address.as_str()).await.unwrap();
             }
         });
-        join.await;
-        */
+        joins.push(join);
     }
+    join_all(joins).await;
     Ok(())
 }
