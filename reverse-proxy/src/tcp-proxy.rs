@@ -5,6 +5,9 @@ extern crate log;
 
 use futures::future::join_all;
 
+use getopts::Options;
+use std::env;
+
 use tokio::join;
 use tokio::net::TcpListener;
 use tokio::net::TcpSocket;
@@ -96,10 +99,37 @@ fn load_config(config_file: &str) -> Vec<RuleConfig> {
     return rules;
 }
 
+fn print_usage(program: &str, opts: Options) {
+    let brief = format!("Usage: {} [options]", program);
+    print!("{}", opts.usage(&brief));
+}
+
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    let config_file: &str = "/home/carlosb/rust-workspace/examples-rust/reverse-proxy/config.yml";
-    let rule_configs = load_config(config_file);
+    let args: Vec<String> = env::args().collect();
+    let mut opts = Options::new();
+    opts.optflag("h", "help", "print this help menu");
+    opts.optopt(
+        "f",
+        "config.yml",
+        "specify configuration file for tcp rules",
+        "CONFIG_FILE_PROXY",
+    );
+
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => m,
+        Err(f) => {
+            panic!(f.to_string())
+        }
+    };
+    let program = args[0].clone();
+    if matches.opt_present("h") {
+        print_usage(&program, opts);
+        return;
+    }
+
+    let config_file = matches.opt_str("f").unwrap();
+    let rule_configs = load_config(config_file.as_str());
 
     pretty_env_logger::init();
 
