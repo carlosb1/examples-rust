@@ -17,6 +17,8 @@ use tokio::task;
 use std::collections::HashMap;
 
 use std::io;
+//TODO validate configuration
+//TODO validate host before to use
 
 type HashAddressInfo = HashMap<String, HashMap<String, String>>;
 type HashContainsYaml = HashMap<String, HashAddressInfo>;
@@ -42,7 +44,7 @@ async fn forward(mut stream_origin: TcpStream, output_address: &str) -> io::Resu
     if let Ok(count) = stream_output_bytes_copied {
         info!("Stream output transfered bytes: {}", count);
     } else {
-        error!("Stream output eError transfering bytes");
+        error!("Stream output error transfering bytes");
     }
 
     Ok(())
@@ -74,8 +76,13 @@ fn load_config(config_file: &str) -> Vec<RuleConfig> {
                 port: 0,
             },
             |v| Host {
-                host: v["host"].clone(),
-                port: v["port"].clone().parse::<i32>().unwrap(),
+                host: v.get("host").unwrap_or(&"".to_owned()).clone(),
+                port: v
+                    .get("port")
+                    .unwrap_or(&"".to_owned())
+                    .clone()
+                    .parse::<i32>()
+                    .unwrap(),
             },
         );
         let address_output = value.clone().get_mut("output").map_or(
@@ -84,8 +91,13 @@ fn load_config(config_file: &str) -> Vec<RuleConfig> {
                 port: 0,
             },
             |v| Host {
-                host: v["host"].clone(),
-                port: v["port"].clone().parse::<i32>().unwrap(),
+                host: v.get("host").unwrap_or(&"".to_owned()).clone(),
+                port: v
+                    .get("port")
+                    .unwrap_or(&"".to_owned())
+                    .clone()
+                    .parse::<i32>()
+                    .unwrap(),
             },
         );
 
@@ -105,7 +117,7 @@ fn print_usage(program: &str, opts: Options) {
 }
 
 #[tokio::main]
-async fn main() -> io::Result<()> {
+async fn main() -> std::result::Result<(), std::io::Error> {
     let args: Vec<String> = env::args().collect();
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
@@ -125,9 +137,13 @@ async fn main() -> io::Result<()> {
     let program = args[0].clone();
     if matches.opt_present("h") {
         print_usage(&program, opts);
-        return;
+        return Ok(());
     }
 
+    if !matches.opt_present("f") {
+        print_usage(&program, opts);
+        return Ok(());
+    }
     let config_file = matches.opt_str("f").unwrap();
     let rule_configs = load_config(config_file.as_str());
 
