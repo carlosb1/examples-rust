@@ -62,6 +62,7 @@ pub struct RuleConfig {
 }
 
 fn load_config(config_file: &str) -> Vec<RuleConfig> {
+    info!("Loading configuration {}", config_file);
     let mut settings = config::Config::default();
     settings
         .merge(config::File::with_name(config_file))
@@ -113,11 +114,12 @@ fn load_config(config_file: &str) -> Vec<RuleConfig> {
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
-    print!("{}", opts.usage(&brief));
+    println!("{}", opts.usage(&brief));
 }
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), std::io::Error> {
+    pretty_env_logger::init();
     let args: Vec<String> = env::args().collect();
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
@@ -147,18 +149,21 @@ async fn main() -> std::result::Result<(), std::io::Error> {
     let config_file = matches.opt_str("f").unwrap();
     let rule_configs = load_config(config_file.as_str());
 
-    pretty_env_logger::init();
-
     let mut joins = Vec::new();
     for rule in rule_configs {
         let input_host = rule.input.host;
         let input_port = rule.input.port;
         let output_host = rule.output.host;
         let output_port = rule.output.port;
+        let rule_name = rule.name;
 
         let join = task::spawn(async move {
             let output_address = format!("{}:{}", output_host, output_port);
             let input_address = format!("{}:{}", input_host, input_port);
+            info!(
+                "SERVICE {} - input address {} to output address {}",
+                rule_name, input_address, output_address
+            );
             let listener = TcpListener::bind(output_address.clone())
                 .await
                 .expect(format!("Error binding address {}", output_address).as_str());

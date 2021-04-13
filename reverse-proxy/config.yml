@@ -5,3 +5,11 @@ http_python:
         output:
                 host: 0.0.0.0
                 port: 8081
+
+http_python2:
+        input:
+                host: 0.0.0.0
+                port: 8001
+        output:
+                host: 0.0.0.0
+                port: 8082
