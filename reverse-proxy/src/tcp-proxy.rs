@@ -1,27 +1,23 @@
-extern crate config;
 extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
-use futures::future::join_all;
+pub mod config;
 
-use getopts::Options;
 use std::env;
+use std::io;
 
+use futures::future::join_all;
+use getopts::Options;
 use tokio::join;
 use tokio::net::TcpListener;
 use tokio::net::TcpSocket;
 use tokio::net::TcpStream;
 use tokio::task;
 
-use std::collections::HashMap;
-
-use std::io;
+use crate::config::load_config;
 //TODO validate configuration
 //TODO validate host before to use
-
-type HashAddressInfo = HashMap<String, HashMap<String, String>>;
-type HashContainsYaml = HashMap<String, HashAddressInfo>;
 
 async fn forward(mut stream_origin: TcpStream, output_address: &str) -> io::Result<()> {
     let socket_output = TcpSocket::new_v4()?;
@@ -48,68 +44,6 @@ async fn forward(mut stream_origin: TcpStream, output_address: &str) -> io::Resu
     }
 
     Ok(())
-}
-
-pub struct Host {
-    host: String,
-    port: i32,
-}
-
-pub struct RuleConfig {
-    name: String,
-    input: Host,
-    output: Host,
-}
-
-fn load_config(config_file: &str) -> Vec<RuleConfig> {
-    info!("Loading configuration {}", config_file);
-    let mut settings = config::Config::default();
-    settings
-        .merge(config::File::with_name(config_file))
-        .unwrap();
-    let mut doc = settings.try_into::<HashContainsYaml>().unwrap();
-
-    let mut rules: Vec<RuleConfig> = Vec::new();
-    for (name, value) in doc.iter_mut() {
-        let address_input = value.clone().get_mut("input").map_or(
-            Host {
-                host: "".to_owned(),
-                port: 0,
-            },
-            |v| Host {
-                host: v.get("host").unwrap_or(&"".to_owned()).clone(),
-                port: v
-                    .get("port")
-                    .unwrap_or(&"".to_owned())
-                    .clone()
-                    .parse::<i32>()
-                    .unwrap(),
-            },
-        );
-        let address_output = value.clone().get_mut("output").map_or(
-            Host {
-                host: "".to_owned(),
-                port: 0,
-            },
-            |v| Host {
-                host: v.get("host").unwrap_or(&"".to_owned()).clone(),
-                port: v
-                    .get("port")
-                    .unwrap_or(&"".to_owned())
-                    .clone()
-                    .parse::<i32>()
-                    .unwrap(),
-            },
-        );
-
-        rules.push(RuleConfig {
-            name: name.to_string(),
-            input: address_input,
-            output: address_output,
-        });
-    }
-
-    return rules;
 }
 
 fn print_usage(program: &str, opts: Options) {
@@ -166,7 +100,7 @@ async fn main() -> std::result::Result<(), std::io::Error> {
             );
             let listener = TcpListener::bind(output_address.clone())
                 .await
-                .expect(format!("Error binding address {}", output_address).as_str());
+                .expect(format!("Error binding address {}", output_address.clone()).as_str());
             //TODO loop to wait for connection, is it needed this loop?
             loop {
                 let (socket, _) = listener.accept().await.unwrap();

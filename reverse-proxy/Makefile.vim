@@ -4,4 +4,4 @@ build:
 	cargo build
 
 test: build
-	cargo run --bin tcp-proxy
+	RUST_LOG=info cargo run --bin tcp-proxy -- -f config.yml
