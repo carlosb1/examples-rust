@@ -15,8 +15,6 @@ getopts = "0.2.21"
 rand = "0.7.3"
 trust-dns-resolver = "0.19.5"
 tokio = { version = "1", features = ["full"] }
-warp = '0.3'
-warp-reverse-proxy='0.3'
 
 [[bin]]
 name='main'
