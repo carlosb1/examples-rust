@@ -23,9 +23,5 @@ name='main'
 path='src/main.rs'
 
 [[bin]]
-name='http-proxy'
-path='src/http-proxy.rs'
-
-[[bin]]
 name='tcp-proxy'
 path='src/tcp-proxy.rs'
