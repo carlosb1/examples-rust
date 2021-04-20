@@ -8,9 +8,6 @@ use tokio::task;
 
 use crate::config::RuleConfig;
 
-//TODO validate configuration
-//TODO validate host before to use
-
 pub struct Proxy {}
 
 impl Proxy {

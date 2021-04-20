@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::net::*;
+use trust_dns_resolver::config::*;
+use trust_dns_resolver::Resolver;
 
 type HashAddressInfo = HashMap<String, HashMap<String, String>>;
 type HashContainsYaml = HashMap<String, HashAddressInfo>;
@@ -13,6 +16,36 @@ pub struct RuleConfig {
     pub name: String,
     pub input: Host,
     pub output: Host,
+}
+
+trait Filter {
+    fn is_valid(&self, rule_config: &RuleConfig) -> bool;
+}
+
+pub struct WellformedHost {}
+
+impl Filter for WellformedHost {
+    fn is_valid(&self, rule_config: &RuleConfig) -> bool {
+        return !rule_config.input.host.is_empty();
+    }
+}
+
+pub struct ResolvedAddress {
+    resolver: Resolver,
+}
+impl ResolvedAddress {
+    pub fn new() -> ResolvedAddress {
+        let resolver = Resolver::new(ResolverConfig::default(), ResolverOpts::default()).unwrap();
+        ResolvedAddress { resolver }
+    }
+}
+
+impl Filter for ResolvedAddress {
+    fn is_valid(&self, rule_config: &RuleConfig) -> bool {
+        self.resolver
+            .lookup_ip(rule_config.input.host.as_str())
+            .map_or(false, |response| response.iter().next().is_some())
+    }
 }
 
 pub fn load_config(config_file: &str) -> Vec<RuleConfig> {
