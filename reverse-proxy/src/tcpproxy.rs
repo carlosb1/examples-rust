@@ -11,9 +11,20 @@ use crate::config::RuleConfig;
 pub struct Proxy {}
 
 impl Proxy {
+    /// Proxy Layer 3 implementation. It fowards tcp/ip packets from an origin service (address and
+    /// port) and it is forwarded in a local port.
+    ///
+    /// Constructor initializes an proxy instance.
     pub fn new() -> Proxy {
         Proxy {}
     }
+    /// Async. function to apply a forwarding port among services.
+    ///
+    /// # Arguments
+    ///
+    /// * `stream_origin` - Origin tcpstream (source tcp service that it will be forwarded)
+    /// * `output_address` - Output address where it will be forwarded
+    ///
     pub async fn forward(mut stream_origin: TcpStream, output_address: &str) -> io::Result<()> {
         let socket_output = TcpSocket::new_v4()?;
         let mut stream_output = socket_output
@@ -39,6 +50,12 @@ impl Proxy {
         }
         Ok(())
     }
+
+    /// Main async function that it throws each thread for any address to forward
+    ///
+    /// # Arguments
+    ///
+    /// * `rule_configs`: List of rules that speficy what will be forwarded.
     pub async fn run(&self, rule_configs: &Vec<RuleConfig>) {
         let mut joins = Vec::new();
         for rule in rule_configs {

@@ -9,6 +9,8 @@ use crate::tcpproxy::Proxy;
 use getopts::Options;
 use std::env;
 
+/// Main entrypoint where it is loaded configuraiton and it is ran
+/// forward addresses.
 #[tokio::main]
 async fn main() -> std::result::Result<(), std::io::Error> {
     pretty_env_logger::init();
@@ -44,6 +46,13 @@ async fn main() -> std::result::Result<(), std::io::Error> {
     proxy.run(&rule_config).await;
     Ok(())
 }
+
+/// Function for print usage
+///
+/// # Arguments
+///
+/// * `program` Program name.
+/// * `opts` Specify available options.
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
     println!("{}", opts.usage(&brief));
