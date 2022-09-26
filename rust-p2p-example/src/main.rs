@@ -1,10 +1,18 @@
-use libp2p::floodsub::Topic;
-use libp2p::identity;
-use libp2p::PeerId;
+use libp2p::{
+    core::upgrade,
+    floodsub::{Floodsub, FloodsubEvent, Topic},
+    futures::StreamExt,
+    identity,
+    mdns::{Mdns, MdnsEvent},
+    mplex,
+    noise::{Keypair, NoiseConfig, X25519Spec},
+    swarm::{NetworkBehaviourEventProcess, Swarm, SwarmBuilder},
+    tcp::GenTcpConfig,
+    NetworkBehaviour, PeerId, Transport,
+};
 use log::{error, info};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tokio::noise::{Keypair, X25519Spec};
 use tokio::{fs, io::AsyncBufReadExt, sync::mpsc};
 
 const STORAGE_FILE_PATH: &str = "./recipes.json";
@@ -46,12 +54,168 @@ enum EventType {
     Input(String),
 }
 
+#[derive(NetworkBehaviour)]
+struct RecipeBehaviour {
+    floodsub: Floodsub,
+    mdns: Mdns,
+    #[behaviour(ignore)]
+    response_sender: mpsc::UnboundedSender<ListResponse>,
+}
+
+impl NetworkBehaviourEventProcess<FloodsubEvent> for RecipeBehaviour {
+    fn inject_event(&mut self, event: FloodsubEvent) {
+        match event {
+            FloodsubEvent::Message(msg) => {
+                if let Ok(resp) = serde_json::from_slice::<ListResponse>(&msg.data) {
+                    if resp.receiver == PEER_ID.to_string() {
+                        info!("Response from {}:", msg.source);
+                        resp.data.iter().for_each(|r| info!("{:?}", r));
+                    }
+                } else if let Ok(req) = serde_json::from_slice::<ListRequest>(&msg.data) {
+                    match req.mode {
+                        ListMode::ALL => {
+                            info!("Received ALL req: {:?} from {:?}", req, msg.source);
+                            respond_with_public_recipes(
+                                self.response_sender.clone(),
+                                msg.source.to_string(),
+                            );
+                        }
+                        ListMode::One(ref peer_id) => {
+                            if peer_id == &PEER_ID.to_string() {
+                                info!("Received req: {:?} from {:?}", req, msg.source);
+                                respond_with_public_recipes(
+                                    self.response_sender.clone(),
+                                    msg.source.to_string(),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+}
+
+fn respond_with_public_recipes(sender: mpsc::UnboundedSender<ListResponse>, receiver: String) {
+    tokio::spawn(async move {
+        match read_local_recipes().await {
+            Ok(recipes) => {
+                let resp = ListResponse {
+                    mode: ListMode::ALL,
+                    receiver,
+                    data: recipes.into_iter().filter(|r| r.public).collect(),
+                };
+                if let Err(e) = sender.send(resp) {
+                    error!("error sending response via channel, {}", e);
+                }
+            }
+            Err(e) => error!("error fetching local recipes to answer ALL request, {}", e),
+        }
+    });
+}
+
+async fn read_local_recipes() -> Result<Recipe> {
+    let content = fs::read(STORAGE_FILE_PATH).await?;
+    let result = serde_json::from_slice(&content)?;
+    Ok(result)
+}
+
+async fn handle_list_peers(swarm: &mut Swarm<RecipeBehaviour>) {
+    info!("Discovered Peers:");
+    let nodes = swarm.mdns.discovered_nodes();
+    let mut unique_peers = HashSet::new();
+    for peer in nodes {
+        unique_peers.insert(peer);
+    }
+    unique_peers.iter().for_each(|p| info!("{}", p));
+}
+
+impl NetworkBehaviourEventProcess<MdnsEvent> for RecipeBehaviour {
+    fn inject_event(&mut self, event: MdnsEvent) {
+        match event {
+            MdnsEvent::Discovered(discovered_list) => {
+                for (peer, _addr) in discovered_list {
+                    self.floodsub.add_node_to_partial_view(peer);
+                }
+            }
+            MdnsEvent::Expired(expired_list) => {
+                for (peer, _addr) in expired_list {
+                    if !self.mdns.has_node(&peer) {
+                        self.floodsub.remove_node_from_partial_view(&peer);
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
     info!("Peer ID: {}", PEER_ID.clone());
     let (response_sender, mut response_rcv) = mpsc::unbounded_channel();
 
-    let auth_keys = Keypair::<X25519Spec>::new().into_authentic(&KEYS).expect();
-    println!("Hello, world!");
+    let auth_keys = Keypair::<X25519Spec>::new()
+        .into_authentic(&KEYS)
+        .expect("can crate auth keys");
+
+    let transp = GenTcpConfig::new()
+        .upgrade(upgrade::Version::V1)
+        .authenticate(NoiseConfig::xx(auth_keys).into_authenticated())
+        .multiplex(mplex::MplexConfig::new())
+        .boxed();
+    let mut behaviour = RecipeBehaviour {
+        floodsub: Floodsub::new(PEER_ID.clone()),
+        mdns: Mdns::new(Default::default())
+            .await
+            .expect("can create mdns"),
+        response_sender,
+    };
+    behaviour.floodsub.subscribe(TOPIC.clone());
+
+    let mut swarm = SwarmBuilder::new(transp, behaviour, PEER_ID.clone())
+        .executor(Box::new(|fut| {
+            tokio::spawn(fut);
+        }))
+        .build();
+
+    Swarm::listen_on(
+        &mut swarm,
+        "/ip4/0.0.0.0/tcp/0"
+            .parse()
+            .expect("can get a local socket"),
+    )
+    .expect("swarm can be started");
+
+    let mut stdin = tokio::io::BufReader::new(tokio::io::stdin()).lines();
+
+    loop {
+        let evt = {
+            tokio::select! {
+                line = stdin.next_line() => Some(EventType::Input(line.expect("can get line").expect("can read line from stdin"))),
+                event = swarm.next() => {
+                    info!("Unhandled Swarm Event {:?}", event);
+                    None
+                },
+                response = response_rcv.recv() => Some(EventType::Response(response.expect("response exists"))),
+            }
+        };
+
+        if let Some(event) = evt {
+            match event {
+                EventType::Response(resp) => {
+                    //FILL with data
+                }
+
+                EventType::Input(line) => match line.as_str() {
+                    "ls p" => handle_list_peers(&mut swarm).await,
+                    cmd if cmd.starts_with("ls r") => handle_list_recipes(cmd, &mut swarm).await,
+                    cmd if cmd.starts_with("create r") => handle_create_recipes(cmd).await,
+                    cmd if cmd.starts_with("publish r") => handle_publish_recipe(cmd).await,
+                    _ => error!("unknown command"),
+                },
+            }
+        }
+    }
 }
