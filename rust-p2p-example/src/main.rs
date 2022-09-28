@@ -13,6 +13,7 @@ use libp2p::{
 use log::{error, info};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use tokio::{fs, io::AsyncBufReadExt, sync::mpsc};
 
 const STORAGE_FILE_PATH: &str = "./recipes.json";
@@ -191,6 +192,35 @@ async fn write_local_recipes(recipes: &Recipe) -> Result<()> {
     Ok(())
 }
 
+async fn handle_list_recipe(cmd: &str, swarm: &mut Swarm<RecipeBehaviour>) {
+    let rest = cmd.strip_prefix("ls r ");
+    match rest {
+        Some("all") => {
+            let req = ListRequest {
+                mode: ListMode::ALL,
+            };
+            let json = serde_json::to_string(&req).expect("can jsonify request");
+            swarm.floodsub.publish(TOPIC.clone(), json.as_bytes());
+        }
+        Some(recipes_peer_id) => {
+            let req = ListRequest {
+                mode: ListMode::One(recipes_peer_id.to_owned()),
+            };
+            let json = serde_json::to_string(&req).expect("can jsonify request");
+            swarm.floodsub.publish(TOPIC.clone(), json.as_bytes());
+        }
+        None => {
+            match read_local_recipes().await {
+                Ok(v) => {
+                    info!("Local Recipes ({})", v.len());
+                    v.iter().for_each(|r| info!("{:?}", r));
+                }
+                Err(e) => error!("error fetching local recipes: {}", e),
+            };
+        }
+    };
+}
+
 async fn handle_list_peers(swarm: &mut Swarm<RecipeBehaviour>) {
     info!("Discovered Peers:");
     let nodes = swarm.mdns.discovered_nodes();
@@ -280,8 +310,8 @@ async fn main() {
 
                 EventType::Input(line) => match line.as_str() {
                     "ls p" => handle_list_peers(&mut swarm).await,
-                    cmd if cmd.starts_with("ls r") => handle_list_recipes(cmd, &mut swarm).await,
-                    cmd if cmd.starts_with("create r") => handle_create_recipes(cmd).await,
+                    cmd if cmd.starts_with("ls r") => handle_list_recipe(cmd, &mut swarm).await,
+                    cmd if cmd.starts_with("create r") => handle_create_recipe(cmd).await,
                     cmd if cmd.starts_with("publish r") => handle_publish_recipe(cmd).await,
                     _ => error!("unknown command"),
                 },
