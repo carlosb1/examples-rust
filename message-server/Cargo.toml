@@ -7,6 +7,8 @@ edition = "2021"
 
 [dependencies]
 message-io = "0.16"
+bincode = "1.3.1"
+serde = { version = "1.0", features = ["derive"] }
 
 [[bin]]
 name = "client"
@@ -15,3 +17,7 @@ path = "src/client.rs"
 [[bin]]
 name = "server"
 path = "src/server.rs"
+
+[[bin]]
+name = "dist-server"
+path = "src/discovery_server.rs"
