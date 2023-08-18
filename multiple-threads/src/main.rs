@@ -1,7 +1,11 @@
 use clap::Parser;
 use rand::Rng;
+use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
+//use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 use tokio::task;
 
@@ -37,45 +41,10 @@ async fn bg_report_task(_report: &SharedReport, stop: &Stop) {
     let _ = join.await;
 }
 
-async fn run_threads(report: &SharedReport, stop: &Stop) {
-    // Copy structure to manage conc.//
-    let report_1 = report.clone();
-    let stop_1 = stop.clone();
-    let join = task::spawn(async move {
-        for x in 0..10 {
-            if *stop_1.lock().unwrap() == true {
-                break;
-            }
-            let mut rep = report_1.lock().unwrap();
-            rep.total_numbers += 1;
-            println!("First thread working {}", x);
-            thread::sleep(time::Duration::from_secs(
-                rand::thread_rng().gen_range(0..2),
-            ));
-        }
-        *stop_1.lock().unwrap() = true;
-    });
-
-    // Copy structure to manage conc.//
-    let report_2 = report.clone();
-    let stop_2 = stop.clone();
-    let join2 = task::spawn(async move {
-        for x in 0..10 {
-            if *stop_2.lock().unwrap() == true {
-                break;
-            }
-            println!("Second thread working {}", x);
-            thread::sleep(time::Duration::from_secs(
-                rand::thread_rng().gen_range(0..2),
-            ));
-            let rep = report_2.lock().unwrap();
-            println!("my repo info {:?}", rep.total_numbers);
-        }
-        *stop_2.lock().unwrap() = true;
-    });
-
-    let _ = join.await;
-    let _ = join2.await;
+pub struct TCPServer {
+    host: String,
+    port: u32,
+    max_clients: u8,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -85,11 +54,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let report: SharedReport = Arc::new(Mutex::new(Report { total_numbers: 0 }));
         let stop: Stop = Arc::new(Mutex::new(false));
 
-        println!("I am server");
+        //TCPServer
+        let tcp_server = TCPServer::new("127.0.0.1".to_string(), 8080, 5);
+
         let rt = Runtime::new()?;
         rt.block_on(async {
             bg_report_task(&report, &stop).await;
-            run_threads(&report, &stop).await;
+            let _ = tcp_server.run(&report, &stop).await;
         });
     } else if args.mode == Mode::Client {
         println!("I am a client");
