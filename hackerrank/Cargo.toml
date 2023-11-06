@@ -1,0 +1,23 @@
+[package]
+name = "hackerrank"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[[bin]]
+name = "exer1"
+path = "src/exer1.rs"
+
+[[bin]]
+name = "exer2"
+path = "src/exer2.rs"
+
+[[bin]]
+name = "exer3"
+path = "src/exer3.rs"
+
+[[bin]]
+name = "exer4"
+path = "src/exer4.rs"
